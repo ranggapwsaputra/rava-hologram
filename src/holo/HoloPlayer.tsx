@@ -4,9 +4,15 @@ import Home from "./Home";
 import MusicApp from "./apps/MusicApp";
 import RobotApp from "./apps/RobotApp";
 import MemeApp from "./apps/MemeApp";
+import MemeGallery from "./apps/MemeGallery";
+import { memeStore, memeEvents } from "./memeStore";
+import type { Meme } from "./memeStore";
 import GestureFxApp from "./apps/GestureFxApp";
 import ChordLabApp from "./apps/ChordLabApp";
 import NewsApp from "./apps/NewsApp";
+import NewsCarousel from "./apps/NewsCarousel";
+import { newsStore, newsEvents } from "./newsStore";
+import type { NewsItem } from "./newsStore";
 import WindowMenu, { WINDOW_MENU } from "./WindowMenu";
 import Overlay from "./Overlay";
 import HudChrome from "./HudChrome";
@@ -48,6 +54,14 @@ export default function HoloPlayer() {
   const trackingRef = useRef(false);
   const view = useSyncExternalStore(appView.sub, appView.get);
 
+  // Subscribe to news items (written by NewsApp outside Canvas, read here + passed to NewsCarousel)
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  useEffect(() => { return newsEvents.sub(() => setNewsItems([...newsStore.items])); }, []);
+
+  // Subscribe to meme items (written by MemeApp outside Canvas, passed to MemeGallery inside Canvas)
+  const [memeItems, setMemeItems] = useState<Meme[]>([]);
+  useEffect(() => { return memeEvents.sub(() => setMemeItems([...memeStore.memes])); }, []);
+
   // start the camera + hand-tracking on load (so the open-hand gesture works on the loading screen)
   async function startTracking() {
     if (trackingRef.current) return;
@@ -88,7 +102,7 @@ export default function HoloPlayer() {
     return () => { window.removeEventListener("pointerdown", resume); window.removeEventListener("keydown", resume); };
   }, []);
 
-  const dim = view !== "home" && view !== "music";
+  const dim = view !== "home" && view !== "music" && view !== "news" && view !== "meme";
 
   // Face-HUD framing (Level 1): a fixed face "window" the HUD wraps around.
   // Tune these to fit your framing — Level 2 will drive them live from FaceMesh.
@@ -139,8 +153,10 @@ export default function HoloPlayer() {
       {started && view !== "gesturefx" && view !== "chordlab" && <HandFX />}
 
       <Canvas camera={{ position: [0, 0, 0.12], fov: 74 }} dpr={[1, 2]} gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }} className="absolute inset-0 z-10">
-        {!WINDOW_MENU && view === "home" && <Home />}
+        {!WINDOW_MENU && view === "home"  && <Home />}
         {view === "music" && <MusicApp />}
+        {view === "news"  && <NewsCarousel items={newsItems} />}
+        {view === "meme"  && <MemeGallery memes={memeItems} />}
       </Canvas>
 
       {started && WINDOW_MENU && view === "home" && <WindowMenu />}

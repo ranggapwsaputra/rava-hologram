@@ -15,6 +15,14 @@ A futuristic, Iron-Man-inspired holographic OS controlled via webcam hand tracki
   - **Point & Hold (☝️)**: Trigger R.A.V.A voice synthesis (Text-to-Speech) to read aloud the selected article and AI analysis.
   - **Hold Fist (✊)**: Return to main Holographic Home.
 
+### 😂 Holographic 3D Meme Gallery (`MemeApp`)
+- **3D Stellar Card Gallery**: Memes are distributed in a floating $360^\circ$ cylindrical stellar constellation with organic tilt and smooth floating animations.
+- **Dual-Hand Gestures**:
+  - **Left Hand Open (✋)**: Move around in mid-air to dynamically orbit and tilt the camera.
+  - **Right Hand Pinch & Drag (🤏)**: Spin the entire meme gallery wheel in 3D space.
+  - **Right Hand Point & Hold (👉)**: Hover on any card and dwell select to pop up a full-screen high-quality preview.
+  - **Hold Fist (✊)**: Close the preview or exit the module completely.
+
 ---
 
 ## 🖐️ Interactive Hands-Free Apps
@@ -28,7 +36,7 @@ Built with React + Vite, React-Three-Fiber, MediaPipe Hands, and Web Speech API.
 | 🤖 **Interactive 3D Robot / AI Agent** | Hand-tracked 3D robotic entity simulation & voice assistant integration |
 | 🎛️ **Gesture FX** | CDJ-style two-handed audio FX (Filter, Echo, Delay, Reverb, Flanger) |
 | 🎹 **Chord Lab** | Dual-wheel aiming · Pinch gesture piano synthesizer |
-| 😂 **Meme of the Day** | Point & hold for instant meme generation |
+| 😂 **Meme of the Day** | 3D Floating Stellar Gallery · 🤏 Pinch-drag to spin · ✋ Left hand open to orbit camera · 👉 Point-hold to zoom full-screen |
 
 ---
 
