@@ -7,16 +7,16 @@ import { GRAB_NAV } from "./Carousel";
 
 const HINTS: Partial<Record<View, string>> = GRAB_NAV
   ? {
-    home:  "🤏 pinch & drag to spin · 👉 point to open",
+    home: "🤏 pinch & drag to spin · 👉 point to open",
     music: "🤏 pinch & drag to spin · 👉 point to play/pause · ✊ hold fist to exit",
-    news:  "🤏 pinch & drag to read · 👉 point to read by RAVA · ✊ hold fist to exit",
-    meme:  "🤏 pinch & drag to spin · ✋ left hand to orbit · 👉 point to zoom · ✊ exit",
+    news: "🤏 pinch & drag to read · 👉 point to read by RAVA · ✊ hold fist to exit",
+    meme: "🤏 pinch & drag to spin · ✋ left hand to orbit · 👉 point to zoom · ✊ exit",
   }
   : {
-    home:  "✋ swipe to browse · 👉 point to open",
+    home: "✋ swipe to browse · 👉 point to open",
     music: "✋ swipe to flip · 👉 point to play/pause · ✊ hold fist to exit",
-    news:  "✋ swipe to flip · 👉 point to read by RAVA · ✊ hold fist to exit",
-    meme:  "🤏 pinch & drag to spin · ✋ left hand to orbit · 👉 point to zoom · ✊ exit",
+    news: "✋ swipe to flip · 👉 point to read by RAVA · ✊ hold fist to exit",
+    meme: "🤏 pinch & drag to spin · ✋ left hand to orbit · 👉 point to zoom · ✊ exit",
   };
 
 export default function Overlay({ view }: { view: View }) {
@@ -70,8 +70,8 @@ export default function Overlay({ view }: { view: View }) {
       {view === "home" && (
         <div className="welcome">
           <div className="wbox">
-            <div className="tag">HOLO OS</div>
-            <h2>Welcome to RAVA Space</h2>
+            <div className="tag">Hologram Mode</div>
+            <h2>RAVA Space Hologram</h2>
             <p>A holographic, Iron-Man-inspired playground designed for you to safely explore and unwind when you're feeling burned out. Point at an app to open it.</p>
           </div>
         </div>

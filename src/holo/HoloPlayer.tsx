@@ -141,14 +141,40 @@ export default function HoloPlayer() {
         }}
       />
 
-      {/* holographic ring framing the face (hidden inside apps) */}
-      <div className="absolute pointer-events-none transition-opacity duration-500" style={{
-        left: "var(--face-x)", top: "var(--face-y)", width: "32vw", height: "48vh",
-        transform: "translate(-50%, -50%)", borderRadius: "50%",
-        border: "1px solid rgba(95,230,255,.22)",
-        boxShadow: "inset 0 0 70px rgba(95,230,255,.16), 0 0 50px rgba(95,230,255,.10)",
-        opacity: dim ? 0 : 1,
-      }} />
+      {/* Dynamic tracking orbital rings around the face (hidden inside apps) */}
+      {!dim && (
+        <>
+          {/* Inner solid pulsating ring */}
+          <div className="absolute pointer-events-none transition-opacity duration-500" style={{
+            left: "var(--face-x)", top: "var(--face-y)", width: "27vw", height: "40.5vh",
+            transform: "translate(-50%, -50%)", borderRadius: "50%",
+            border: "1.5px solid rgba(95,230,255,.32)",
+            boxShadow: "inset 0 0 60px rgba(95,230,255,.16), 0 0 40px rgba(95,230,255,.10)",
+            animation: "pulseGlow 2.5s ease-in-out infinite",
+          }} />
+          {/* Middle dashed clockwise ring */}
+          <div className="absolute pointer-events-none transition-opacity duration-500" style={{
+            left: "var(--face-x)", top: "var(--face-y)", width: "31vw", height: "46.5vh",
+            transform: "translate(-50%, -50%)", borderRadius: "50%",
+            border: "1px dashed rgba(95,230,255,.24)",
+            animation: "rotateCW 24s linear infinite",
+          }} />
+          {/* Outer dotted counter-clockwise ring */}
+          <div className="absolute pointer-events-none transition-opacity duration-500" style={{
+            left: "var(--face-x)", top: "var(--face-y)", width: "35vw", height: "52.5vh",
+            transform: "translate(-50%, -50%)", borderRadius: "50%",
+            border: "1.2px dotted rgba(168,85,247,.22)",
+            animation: "rotateCCW 32s linear infinite",
+          }} />
+          {/* Tech crosshairs targeting ticks overlay */}
+          <div className="absolute pointer-events-none transition-opacity duration-500" style={{
+            left: "var(--face-x)", top: "var(--face-y)", width: "33vw", height: "49.5vh",
+            transform: "translate(-50%, -50%)", borderRadius: "50%",
+            border: "3px double rgba(95,230,255,.12)",
+            clipPath: "polygon(48% 0%, 52% 0%, 52% 100%, 48% 100%, 0% 48%, 0% 52%, 100% 52%, 100% 48%)",
+          }} />
+        </>
+      )}
 
       {started && view !== "gesturefx" && view !== "chordlab" && <HandFX />}
 

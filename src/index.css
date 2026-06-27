@@ -10,30 +10,34 @@ body { margin: 0; background: #000; overflow: hidden; font-family: "Helvetica Ne
 .winmenu { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
 .winmenu-win {
   position: absolute; transform-style: preserve-3d; --p: 0; pointer-events: auto;
-  border-radius: 14px; overflow: hidden; opacity: .9;
-  background: linear-gradient(150deg, rgba(150,220,255,.10), rgba(28,12,52,.18));
-  border: 1.5px solid color-mix(in srgb, var(--c, #8be9ff) 70%, white 10%);
+  border-radius: 12px; overflow: hidden; opacity: .88;
+  background: radial-gradient(circle, rgba(255,255,255,0.06) 1.2px, transparent 1.2px) 0 0 / 16px 16px,
+              linear-gradient(150deg, rgba(8, 20, 36, 0.78), rgba(4, 8, 16, 0.90));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1.5px solid color-mix(in srgb, var(--c, #8be9ff) 75%, white 15%);
   box-shadow:
-    inset 0 0 22px color-mix(in srgb, var(--c) 22%, transparent),
-    inset 0 1px 0 rgba(255,255,255,.2),
-    0 0 14px color-mix(in srgb, var(--c) 45%, transparent),
-    0 0 42px color-mix(in srgb, var(--c) 24%, transparent);
-  backdrop-filter: blur(5px) saturate(1.35); -webkit-backdrop-filter: blur(5px) saturate(1.35);
+    inset 0 0 24px color-mix(in srgb, var(--c) 14%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.12),
+    0 4px 20px rgba(0,0,0,.6),
+    0 0 10px color-mix(in srgb, var(--c) 25%, transparent),
+    0 0 26px color-mix(in srgb, var(--c) 10%, transparent);
+  backdrop-filter: blur(8px) saturate(1.35); -webkit-backdrop-filter: blur(8px) saturate(1.35);
   animation: wmfloat 6s ease-in-out infinite;
   transition: box-shadow .25s, border-color .25s, scale .18s, opacity .25s;
 }
 @keyframes wmfloat { 0%,100% { translate: 0 0 } 50% { translate: 0 -11px } }
 .winmenu-win.hov {
-  border-color: #ffffff; opacity: 1;
+  border-color: color-mix(in srgb, var(--c) 90%, white 10%); opacity: 1;
   box-shadow:
-    inset 0 0 26px color-mix(in srgb, var(--c) 30%, transparent),
-    inset 0 1px 0 rgba(255,255,255,.3),
-    0 0 18px color-mix(in srgb, var(--c) 80%, transparent),
-    0 0 48px color-mix(in srgb, var(--c) 50%, transparent),
-    0 0 90px color-mix(in srgb, var(--c) 30%, transparent);
+    inset 0 0 32px color-mix(in srgb, var(--c) 22%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.24),
+    0 6px 30px rgba(0,0,0,.7),
+    0 0 18px color-mix(in srgb, var(--c) 70%, transparent),
+    0 0 48px color-mix(in srgb, var(--c) 40%, transparent),
+    0 0 80px color-mix(in srgb, var(--c) 20%, transparent);
 }
-.wm-bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: rgba(0,0,0,.28);
-  border-bottom: 1px solid color-mix(in srgb, var(--c) 30%, transparent); cursor: grab; }
+.wm-bar { display: flex; align-items: center; gap: 6px; padding: 9px 12px; background: rgba(0,0,0,.42);
+  border-bottom: 1px solid color-mix(in srgb, var(--c) 22%, transparent); cursor: grab; }
 .wm-bar:active { cursor: grabbing; }
 .wm-body { cursor: pointer; }
 .wm-resize { position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; cursor: nwse-resize;
@@ -41,14 +45,78 @@ body { margin: 0; background: #000; overflow: hidden; font-family: "Helvetica Ne
 .wm-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); opacity: .85; }
 .wm-bar span { font-size: 10px; letter-spacing: .03em; color: #bfe7ff; opacity: .72; margin-left: 6px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wm-body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-  height: calc(100% - 34px); color: var(--c); text-shadow: 0 0 12px color-mix(in srgb, var(--c) 55%, transparent); }
-.wm-label { font-size: 15px; font-weight: 800; letter-spacing: .04em; color: #eaffff; }
-.wm-prog { position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--p, 0) * 100%);
-  background: var(--c); box-shadow: 0 0 10px var(--c); transition: width .08s linear; }
-.winmenu-cursor { position: fixed; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%;
-  border: 2px solid #8be9ff; box-shadow: 0 0 14px #8be9ff; z-index: 22; pointer-events: none; transition: opacity .2s, transform .15s; }
-.winmenu-cursor.pinch { transform: scale(.6); background: rgba(139,233,255,.4); }
+.wm-meta-id { font-size: 7.5px; font-family: monospace; color: var(--c); opacity: 0.55; margin-left: auto; letter-spacing: .06em; }
+
+.wm-body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  height: calc(100% - 38px); color: var(--c); text-shadow: 0 0 12px color-mix(in srgb, var(--c) 55%, transparent); padding-bottom: 12px; }
+.wm-label { font-size: 14px; font-weight: 900; letter-spacing: .06em; color: #eaffff; text-transform: uppercase; margin-top: 4px; }
+
+/* ── High-Tech Corner Brackets ── */
+.wm-corner {
+  position: absolute; width: 6px; height: 6px;
+  border: 1.2px solid color-mix(in srgb, var(--c) 40%, transparent);
+  pointer-events: none;
+  transition: all .25s ease;
+}
+.wm-corner.tl { top: 6px; left: 6px; border-right: 0; border-bottom: 0; }
+.wm-corner.tr { top: 6px; right: 6px; border-left: 0; border-bottom: 0; }
+.wm-corner.bl { bottom: 6px; left: 6px; border-right: 0; border-top: 0; }
+.wm-corner.br { bottom: 6px; right: 6px; border-left: 0; border-top: 0; }
+.winmenu-win.hov .wm-corner { border-color: var(--c); box-shadow: 0 0 4px var(--c); }
+
+/* ── Monospace HUD Telemetry Displays in Corners ── */
+.wm-meta-coord {
+  position: absolute; bottom: 8px; left: 12px;
+  font-size: 7px; font-family: monospace;
+  color: rgba(255,255,255,.35); letter-spacing: .04em;
+  pointer-events: none;
+}
+.wm-meta-status {
+  position: absolute; bottom: 8px; right: 12px;
+  font-size: 7px; font-family: monospace;
+  color: rgba(255,255,255,.35); letter-spacing: .04em;
+  pointer-events: none;
+}
+.winmenu-win.hov .wm-meta-coord, .winmenu-win.hov .wm-meta-status {
+  color: color-mix(in srgb, var(--c) 65%, white 35%);
+}
+
+/* ── Rotating Holographic rings behind icons ── */
+.wm-icon-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 90px; height: 90px;
+}
+.wm-icon-ring {
+  position: absolute;
+  width: 68px; height: 68px;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, var(--c) 20%, transparent);
+  animation: rotateCW 18s linear infinite;
+}
+.wm-icon-ring-outer {
+  position: absolute;
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  border: 1px dotted color-mix(in srgb, var(--c) 12%, transparent);
+  animation: rotateCCW 28s linear infinite;
+}
+.winmenu-win.hov .wm-icon-ring {
+  border-color: color-mix(in srgb, var(--c) 45%, transparent);
+  box-shadow: inset 0 0 6px color-mix(in srgb, var(--c) 15%, transparent);
+}
+
+.wm-prog { position: absolute; left: 0; bottom: 0; height: 2px; width: calc(var(--p, 0) * 100%);
+  background: var(--c); box-shadow: 0 0 10px var(--c), 0 0 20px var(--c); transition: width .08s linear; }
+
+.winmenu-cursor { position: fixed; width: 22px; height: 22px; margin: -11px 0 0 -11px;
+  border-radius: 50%; border: 1px solid rgba(95,230,255,.6); box-shadow: 0 0 10px rgba(95,230,255,.3);
+  z-index: 22; pointer-events: none; transition: opacity .2s, transform .15s; }
+.winmenu-cursor::before, .winmenu-cursor::after { content: ""; position: absolute; background: #5fe6ff; }
+.winmenu-cursor::before { left: 4px; right: 4px; top: 10px; height: 1px; }
+.winmenu-cursor::after { top: 4px; bottom: 4px; left: 10px; width: 1px; }
+.winmenu-cursor.pinch { transform: scale(.7) rotate(45deg); background: rgba(95,230,255,.2); border-color: #5fe6ff; }
 
 /* ===== holographic track card (HUD line-art) ===== */
 .holo-card {
@@ -369,7 +437,7 @@ body { margin: 0; background: #000; overflow: hidden; font-family: "Helvetica Ne
 .env-tile span { font-size: 11px; color: #bfe7f2; }
 .env-tile.on { border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); box-shadow: 0 0 22px color-mix(in srgb, var(--c) 40%, transparent); }
 .env-full { position: fixed; inset: 0; z-index: 30; overflow: hidden; }
-.env-full.black { background: #000; }
+.env-full.black { background: rgba(0, 0, 0, 0.35); }
 .stardust-svg { position: fixed; inset: 0; width: 100vw; height: 100vh; }
 .env-full.rainbg { background: radial-gradient(120% 100% at 50% 0%, #0a1830, #04060c); }
 .env-cap { position: fixed; left: 0; right: 0; top: 8vh; text-align: center; z-index: 33; font-size: 14px; letter-spacing: .34em;
@@ -539,4 +607,19 @@ body { margin: 0; background: #000; overflow: hidden; font-family: "Helvetica Ne
 }
 /* Loader spin (shared with NewsApp) */
 @keyframes lspin { to { transform: rotate(360deg); } }
+
+/* Rotating HUD keyframes */
+@keyframes rotateCW {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes rotateCCW {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+/* Pulsating glow animation */
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.35; border-color: rgba(95,230,255,.25); box-shadow: inset 0 0 40px rgba(95,230,255,.08), 0 0 20px rgba(95,230,255,.04); }
+  50% { opacity: 0.75; border-color: rgba(95,230,255,.55); box-shadow: inset 0 0 75px rgba(95,230,255,.28), 0 0 45px rgba(95,230,255,.14); }
+}
 

@@ -130,15 +130,49 @@ export default function WindowMenu() {
               transform: `perspective(1000px) rotateY(${L.ry}deg) rotateX(${L.rx}deg)`,
             }}
           >
+            {/* ── High-Tech Corner Brackets ── */}
+            <span className="wm-corner tl" />
+            <span className="wm-corner tr" />
+            <span className="wm-corner bl" />
+            <span className="wm-corner br" />
+
+            {/* ── Title bar with drag handle ── */}
             <div className="wm-bar" onPointerDown={(e) => startDrag(i, e)}>
-              <i /><i /><i /><span>{a.label.toLowerCase().replace(/\s+/g, "-")}.blankspace</span>
+              <i /><i /><i />
+              <span>{a.label.toLowerCase().replace(/\s+/g, "-")}.blankspace</span>
+              <span className="wm-meta-id">[SYS_ID: RA-0{i + 1}]</span>
             </div>
+
+            {/* ── Cybernetic Body ── */}
             <div className="wm-body" onClick={() => open(i)} style={a.soon ? { opacity: 0.62 } : undefined}>
-              <a.Icon size={Math.round(L.h * 0.27)} strokeWidth={1.5} />
+              {/* Rotating holographic dials behind the icon */}
+              <div className="wm-icon-wrap">
+                <div className="wm-icon-ring" />
+                <div className="wm-icon-ring-outer" />
+                <a.Icon size={Math.round(L.h * 0.28)} strokeWidth={1.2} style={{ position: "relative", zIndex: 2 }} />
+              </div>
+              
               <div className="wm-label">{a.label}</div>
-              {a.soon && <div style={{ marginTop: 6, fontSize: 9, fontWeight: 900, letterSpacing: ".16em",
-                color: "#04120b", background: a.color, borderRadius: 20, padding: "3px 10px" }}>COMING SOON</div>}
+              
+              {a.soon && (
+                <div style={{
+                  marginTop: 6, fontSize: 8, fontWeight: 900, letterSpacing: ".18em",
+                  color: "#04120b", background: a.color, borderRadius: 20, padding: "2px 8px",
+                  boxShadow: `0 0 10px ${a.color}`, position: "relative", zIndex: 2
+                }}>
+                  COMING SOON
+                </div>
+              )}
             </div>
+
+            {/* ── Monospace HUD Telemetry Displays in Corners ── */}
+            <div className="wm-meta-coord">
+              LOC: [{Math.round(L.x)}, {Math.round(L.y)}]
+            </div>
+            <div className="wm-meta-status">
+              LINK: STABLE_V.5
+            </div>
+
             <div className="wm-prog" />
             <div className="wm-resize" onPointerDown={(e) => startResize(i, e)} />
           </div>
