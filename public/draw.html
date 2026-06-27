@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>AIR CANVAS · finger painting + text</title>
+<style>
+  html,body { margin:0; height:100%; background:#03060c; overflow:hidden; color:#eaffff;
+    font-family:"Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  #cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1);
+    opacity:.42; filter:contrast(.95) brightness(.62); z-index:0; }
+  #paint, #ui { position:fixed; inset:0; pointer-events:none; }
+  #paint { z-index:1; } #ui { z-index:2; }
+  #start { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:16px; background:radial-gradient(120% 100% at 50% 30%, rgba(7,20,43,.96), rgba(2,5,12,.98)); }
+  #start.hide { display:none; }
+  .title { font-size:50px; font-weight:900; letter-spacing:.14em; color:#5fe6ff; text-shadow:0 0 24px rgba(95,230,255,.8); }
+  .leg { font-size:12px; line-height:1.8; color:#9fc6d8; max-width:560px; text-align:center; }
+  button { margin-top:8px; padding:13px 26px; border-radius:12px; cursor:pointer; font-weight:800; letter-spacing:.08em;
+    background:linear-gradient(120deg,#5fe6ff,#2aa8ff); border:0; color:#03121c; font-size:14px; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <video id="cam" autoplay playsinline muted></video>
+  <canvas id="paint"></canvas>
+  <canvas id="ui"></canvas>
+  <div id="start">
+    <div class="title">AIR&nbsp;CANVAS</div>
+    <div class="leg">
+      <b>🤏 Pinch</b> &amp; move to draw · pinch a <b>swatch</b> / button up top to use it.<br/>
+      <b>TEXT</b>: pinch it, then <b>type on your keyboard</b> — the words appear. Pinch-drag a word to move it.<br/>
+      <b>Pinch with BOTH hands</b> on a word to <b>ZOOM</b> its size (spread = bigger). <b>ERASER · GLOW · CLEAR</b>.
+    </div>
+    <button id="go">START</button>
+  </div>
+<script>
+const COLORS = ["#ff4d6d","#ffd23f","#ffffff","#ff7be5","#ff9f1c","#5fe6ff","#7dffa6","#9b6bff"];
+let color = "#ffffff", eraser = false, glow = false, mode = "draw"; // mode: draw | text
+const d2 = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
+const HC = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+  [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+
+// text objects: {str,x,y,size,color}
+const texts = []; let activeIdx = -1;
+
+// ---- hands ----
+const H = { left:null, right:null };
+function onResults(res){
+  const list = res.multiHandLandmarks || [];
+  let L=null,R=null;
+  if(list.length===1){ const mx=1-list[0][0].x; if(mx<0.5) L=list[0]; else R=list[0]; }
+  else if(list.length>=2){ const a=list.map(h=>({h,mx:1-h[0].x})).sort((p,q)=>p.mx-q.mx); L=a[0].h; R=a[a.length-1].h; }
+  H.left=L; H.right=R;
+}
+function initHands(){
+  const cam=document.getElementById('cam');
+  const hands=new Hands({ locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  hands.setOptions({ maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.6, minTrackingConfidence:0.6 });
+  hands.onResults(onResults);
+  const camera=new Camera(cam,{ onFrame:async()=>{ await hands.send({image:cam}); }, width:640, height:480 });
+  camera.start();
+}
+
+// ---- canvases ----
+const cam=document.getElementById('cam');
+const paint=document.getElementById('paint'), pctx=paint.getContext('2d');
+const uic=document.getElementById('ui'), uctx=uic.getContext('2d');
+const dpr=Math.min(2, window.devicePixelRatio||1);
+function resize(){ for(const [c,x] of [[paint,pctx],[uic,uctx]]){ c.width=innerWidth*dpr; c.height=innerHeight*dpr; c.style.width=innerWidth+'px'; c.style.height=innerHeight+'px'; x.setTransform(dpr,0,0,dpr,0,0); } }
+addEventListener('resize', resize); resize();
+function mapPt(lm){ const vw=cam.videoWidth||16, vh=cam.videoHeight||9, W=innerWidth, Hh=innerHeight;
+  const s=Math.max(W/vw,Hh/vh), dw=vw*s, dh=vh*s; return [W-(lm.x*dw-(dw-W)/2), lm.y*dh-(dh-Hh)/2]; }
+const pinchOf = lm => d2(lm[4],lm[8]) < 0.06;
+
+// ---- toolbar ----
+function swatchAt(i){ return { x: 24 + i*46, y: 30, r: 17 }; }
+const BX = 24+COLORS.length*46+10;
+const ERASER_BTN={x:BX,y:14,w:84,h:32}, GLOW_BTN={x:BX+94,y:14,w:68,h:32}, TEXT_BTN={x:BX+172,y:14,w:62,h:32}, CLEAR_BTN={x:BX+244,y:14,w:68,h:32};
+function inBtn(x,y,b){ return x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h; }
+function uiHit(x,y){
+  for(let i=0;i<COLORS.length;i++){ const s=swatchAt(i); if(Math.hypot(x-s.x,y-s.y)<=s.r+4) return {t:'color',i}; }
+  if(inBtn(x,y,ERASER_BTN)) return {t:'eraser'};
+  if(inBtn(x,y,GLOW_BTN)) return {t:'glow'};
+  if(inBtn(x,y,TEXT_BTN)) return {t:'text'};
+  if(inBtn(x,y,CLEAR_BTN)) return {t:'clear'};
+  return null;
+}
+function doUI(hit){
+  if(hit.t==='color'){ color=COLORS[hit.i]; eraser=false; if(activeIdx>=0) texts[activeIdx].color=color; }
+  else if(hit.t==='eraser'){ eraser=!eraser; }
+  else if(hit.t==='glow'){ glow=!glow; }
+  else if(hit.t==='text'){ texts.push({str:'', x:innerWidth/2, y:innerHeight*0.42, size:60, color}); activeIdx=texts.length-1; mode='text'; }
+  else if(hit.t==='clear'){ pctx.clearRect(0,0,innerWidth,innerHeight); texts.length=0; activeIdx=-1; mode='draw'; }
+}
+
+// ---- keyboard typing for the active text ----
+addEventListener('keydown', e=>{
+  if(mode!=='text' || activeIdx<0) return;
+  const t=texts[activeIdx];
+  if(e.key==='Backspace'){ t.str=t.str.slice(0,-1); e.preventDefault(); }
+  else if(e.key==='Enter'||e.key==='Escape'){ mode='draw'; if(!t.str){ texts.splice(activeIdx,1); activeIdx=-1; } e.preventDefault(); }
+  else if(e.key.length===1){ t.str+=e.key; e.preventDefault(); }
+});
+
+function stroke(x0,y0,x1,y1){
+  if(eraser){ pctx.globalCompositeOperation='destination-out'; pctx.strokeStyle='rgba(0,0,0,1)'; pctx.lineWidth=46; pctx.shadowBlur=0; }
+  else { pctx.globalCompositeOperation='source-over'; pctx.strokeStyle=color; pctx.lineWidth=glow?8:4; if(glow){pctx.shadowColor=color;pctx.shadowBlur=18;}else pctx.shadowBlur=0; }
+  pctx.lineCap='round'; pctx.lineJoin='round'; pctx.beginPath(); pctx.moveTo(x0,y0); pctx.lineTo(x1,y1); pctx.stroke(); pctx.shadowBlur=0;
+}
+function drawHandGreen(lm){
+  uctx.save(); uctx.strokeStyle='rgba(60,255,90,.85)'; uctx.lineWidth=2; uctx.lineCap='round'; uctx.shadowColor='#3cff5a'; uctx.shadowBlur=6;
+  for(const [a,b] of HC){ const [x1,y1]=mapPt(lm[a]),[x2,y2]=mapPt(lm[b]); uctx.beginPath(); uctx.moveTo(x1,y1); uctx.lineTo(x2,y2); uctx.stroke(); }
+  for(let i=0;i<lm.length;i++){ const [x,y]=mapPt(lm[i]); uctx.fillStyle='#aaffbb'; uctx.beginPath(); uctx.arc(x,y,3,0,7); uctx.fill(); }
+  uctx.restore();
+}
+function textWidth(t){ uctx.font='800 '+t.size+'px Helvetica'; return uctx.measureText(t.str||' ').width; }
+function textAt(x,y){ for(let i=texts.length-1;i>=0;i--){ const t=texts[i]; const w=textWidth(t); if(Math.abs(x-t.x)<w/2+14 && Math.abs(y-t.y)<t.size*0.7) return i; } return -1; }
+function drawTexts(){
+  for(let i=0;i<texts.length;i++){ const t=texts[i]; const on=i===activeIdx;
+    uctx.save(); uctx.font='800 '+t.size+'px Helvetica'; uctx.fillStyle=t.color; uctx.textAlign='center'; uctx.textBaseline='middle';
+    uctx.shadowColor=t.color; uctx.shadowBlur=on?16:8;
+    const caret=(mode==='text'&&on)?'|':'';
+    uctx.fillText(t.str+caret, t.x, t.y);
+    if(on){ const w=textWidth(t); uctx.shadowBlur=0; uctx.strokeStyle='rgba(255,255,255,.5)'; uctx.lineWidth=1; uctx.setLineDash([5,5]);
+      uctx.strokeRect(t.x-w/2-10, t.y-t.size*0.62, w+20, t.size*1.24); uctx.setLineDash([]); }
+    uctx.restore();
+  }
+}
+function drawCursor(x,y,p){ uctx.save(); uctx.strokeStyle=eraser?'#fff':color; uctx.lineWidth=p?3:2; uctx.shadowColor=uctx.strokeStyle; uctx.shadowBlur=14;
+  uctx.beginPath(); uctx.arc(x,y,p?16:10,0,7); uctx.stroke(); uctx.restore(); }
+
+const pen={left:{prev:false,mode:'none',lx:0,ly:0,gi:-1,ox:0,oy:0}, right:{prev:false,mode:'none',lx:0,ly:0,gi:-1,ox:0,oy:0}};
+function handLoop(lm, st){
+  if(!lm){ st.prev=false; st.mode='none'; return; }
+  drawHandGreen(lm);
+  const [x,y]=mapPt(lm[8]); const p=pinchOf(lm);
+  drawCursor(x,y,p);
+  if(p && !st.prev){ // press
+    const hit=uiHit(x,y);
+    if(hit){ doUI(hit); st.mode='ui'; }
+    else { const ti=textAt(x,y);
+      if(ti>=0){ activeIdx=ti; if(mode!=='text') mode='draw'; st.mode='movetext'; st.gi=ti; st.ox=texts[ti].x-x; st.oy=texts[ti].y-y; }
+      else { st.mode='draw'; st.lx=x; st.ly=y; if(mode!=='text') activeIdx=-1; } }
+  }
+  if(p && st.mode==='draw'){ stroke(st.lx,st.ly,x,y); st.lx=x; st.ly=y; }
+  if(p && st.mode==='movetext' && st.gi>=0 && texts[st.gi]){ texts[st.gi].x=x+st.ox; texts[st.gi].y=y+st.oy; }
+  if(!p) st.mode='none';
+  st.prev=p;
+}
+
+function drawToolbar(){
+  uctx.save();
+  uctx.fillStyle='rgba(6,12,22,.55)'; uctx.fillRect(0,0,innerWidth,58);
+  for(let i=0;i<COLORS.length;i++){ const s=swatchAt(i); const sel=!eraser&&color===COLORS[i];
+    uctx.beginPath(); uctx.arc(s.x,s.y,s.r,0,7); uctx.fillStyle=COLORS[i]; uctx.shadowColor=COLORS[i]; uctx.shadowBlur=sel?18:6; uctx.fill();
+    uctx.shadowBlur=0; uctx.lineWidth=sel?3:1; uctx.strokeStyle=sel?'#fff':'rgba(255,255,255,.4)'; uctx.stroke(); }
+  const btn=(b,label,on)=>{ uctx.fillStyle=on?'#ff7be5':'rgba(255,255,255,.1)'; roundRect(uctx,b.x,b.y,b.w,b.h,8); uctx.fill();
+    uctx.lineWidth=1; uctx.strokeStyle='rgba(150,225,255,.5)'; uctx.stroke();
+    uctx.fillStyle=on?'#05121c':'#dbf2ff'; uctx.font='800 13px Helvetica'; uctx.textAlign='center'; uctx.textBaseline='middle'; uctx.fillText(label,b.x+b.w/2,b.y+b.h/2); };
+  btn(ERASER_BTN,'ERASER',eraser); btn(GLOW_BTN,'GLOW',glow); btn(TEXT_BTN,'TEXT',mode==='text'); btn(CLEAR_BTN,'CLEAR',false);
+  uctx.restore();
+}
+function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+
+const zoom={on:false,d0:0,s0:0};
+function frame(){
+  requestAnimationFrame(frame);
+  uctx.clearRect(0,0,innerWidth,innerHeight);
+  drawToolbar();
+
+  const L=H.left, R=H.right;
+  const lp=!!(L&&pinchOf(L)), rp=!!(R&&pinchOf(R));
+
+  // TWO-HAND ZOOM: both hands pinch + a selected word → resize it by hand distance
+  if(lp && rp && activeIdx>=0 && texts[activeIdx]){
+    const lt=mapPt(L[8]), rt=mapPt(R[8]);
+    const dist=Math.hypot(rt[0]-lt[0], rt[1]-lt[1]);
+    if(!zoom.on){ zoom.on=true; zoom.d0=Math.max(40,dist); zoom.s0=texts[activeIdx].size; }
+    texts[activeIdx].size=Math.max(14, Math.min(340, zoom.s0*(dist/zoom.d0)));
+    drawHandGreen(L); drawHandGreen(R);
+    // ZOOM line + label
+    uctx.save(); uctx.strokeStyle='rgba(255,200,80,.95)'; uctx.lineWidth=2; uctx.setLineDash([7,5]); uctx.shadowColor='#ffc850'; uctx.shadowBlur=10;
+    uctx.beginPath(); uctx.moveTo(lt[0],lt[1]); uctx.lineTo(rt[0],rt[1]); uctx.stroke(); uctx.setLineDash([]);
+    uctx.fillStyle='#ffc850'; uctx.font='800 15px Helvetica'; uctx.textAlign='center'; uctx.textBaseline='middle';
+    uctx.fillText('ZOOM', (lt[0]+rt[0])/2, (lt[1]+rt[1])/2-10); uctx.restore();
+    pen.left.prev=lp; pen.right.prev=rp; pen.left.mode='none'; pen.right.mode='none';
+    drawTexts();
+    return;
+  }
+  zoom.on=false;
+
+  handLoop(L, pen.left);
+  handLoop(R, pen.right);
+  drawTexts();
+}
+
+document.getElementById('go').addEventListener('click', ()=>{
+  document.getElementById('start').classList.add('hide');
+  try{ initHands(); }catch(e){ console.warn(e); }
+  frame();
+});
+</script>
+</body>
+</html>

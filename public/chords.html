@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>CHORD LAB · HandChords prototype</title>
+<style>
+  :root { --cyan:#5fe6ff; --mag:#ff7be5; }
+  html,body { margin:0; height:100%; background:#03060c; overflow:hidden; color:#eaffff;
+    font-family:"Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  #cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1);
+    opacity:.4; filter:contrast(.95) brightness(.62); z-index:0; }
+  #c { position:fixed; inset:0; z-index:2; pointer-events:none; }
+  #start { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:18px; background:radial-gradient(120% 100% at 50% 30%, rgba(7,20,43,.96), rgba(2,5,12,.98)); }
+  #start.hide { display:none; }
+  .title { font-size:52px; font-weight:900; letter-spacing:.16em; color:var(--cyan);
+    text-shadow:0 0 24px rgba(95,230,255,.8),0 0 60px rgba(95,230,255,.4); }
+  .sub { font-size:12px; letter-spacing:.4em; color:#9fc6d8; margin-top:-10px; }
+  .leg { font-size:12px; line-height:1.7; color:#9fc6d8; max-width:540px; text-align:center; margin-top:6px; }
+  button { margin-top:10px; padding:13px 26px; border-radius:12px; cursor:pointer; font-weight:800; letter-spacing:.08em;
+    background:linear-gradient(120deg,var(--cyan),#2aa8ff); border:0; color:#03121c; font-size:14px; }
+  #hint { position:fixed; left:0; right:0; bottom:5vh; text-align:center; z-index:3; color:#9fc6d8;
+    font-size:12px; letter-spacing:.18em; text-transform:uppercase; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <video id="cam" autoplay playsinline muted></video>
+  <canvas id="c"></canvas>
+  <div id="hint">MOVE A HAND TOWARD A SLICE TO AIM IT · 🤏 PINCH TO PLAY &amp; HOLD</div>
+  <div id="start">
+    <div class="title">CHORD&nbsp;LAB</div>
+    <div class="sub">HAND-CONTROLLED CHORDS</div>
+    <div class="leg">Two wheels <b>stay</b> in place — <b>left = root note</b> (in-key scale), <b>right = chord quality</b>.
+      <b>Move your hand toward a slice</b> (the wheel highlights the one in your hand's direction), then <b>🤏 pinch</b> to play &amp; hold the chord.</div>
+    <button id="go">START CHORD LAB</button>
+  </div>
+<script>
+// index 0 = OFF (point your hand up to rest / mute) — like the reel
+const ROOTS = ["OFF","C","D","E","F","G","A","B"];
+const SCALE = [null,0,2,4,5,7,9,11];
+const QUAL = [
+  { name:"OFF",  sym:null,   iv:null },
+  { name:"maj",  sym:"",     iv:[0,4,7] },
+  { name:"min",  sym:"m",    iv:[0,3,7] },
+  { name:"7",    sym:"7",    iv:[0,4,7,10] },
+  { name:"maj7", sym:"maj7", iv:[0,4,7,11] },
+  { name:"min7", sym:"m7",   iv:[0,3,7,10] },
+  { name:"dim",  sym:"dim",  iv:[0,3,6] },
+  { name:"sus4", sym:"sus4", iv:[0,5,7] },
+  { name:"aug",  sym:"aug",  iv:[0,4,8] },
+];
+const TWO_PI = Math.PI*2, START = -Math.PI/2;
+const HC = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+  [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const TIPS = [4,8,12,16,20];
+const d2 = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
+
+// ---- audio ----
+let synth=null, reverb=null, ready=false, ringing=false, transpose=0; // transpose in semitones (±24)
+function buildAudio(){
+  reverb = new Tone.Reverb({ decay:3, wet:0.22 }).toDestination();
+  // real grand-piano samples (Salamander) → piano tone like the reel, not a synth pad
+  synth = new Tone.Sampler({
+    urls:{ "C3":"C3.mp3","D#3":"Ds3.mp3","F#3":"Fs3.mp3","A3":"A3.mp3",
+           "C4":"C4.mp3","D#4":"Ds4.mp3","F#4":"Fs4.mp3","A4":"A4.mp3","C5":"C5.mp3" },
+    baseUrl:"https://tonejs.github.io/audio/salamander/",
+    release:1.2, onload:()=>{ ready=true; },
+  }).connect(reverb);
+  Tone.loaded().then(()=>{ ready=true; }); // robust: fires once every buffer is decoded
+}
+function chordNotes(ri, qi){ if(SCALE[ri]==null || !QUAL[qi].iv) return []; const base=60+SCALE[ri]+transpose; return QUAL[qi].iv.map(iv => Tone.Frequency(base+iv,"midi").toNote()); }
+function strum(ri, qi){ if(!ready) return; const notes=chordNotes(ri,qi); if(!notes.length) return; synth.releaseAll(); synth.triggerAttack(notes); ringing=true; }
+function release(){ if(ready && ringing){ synth.releaseAll(); ringing=false; } }
+
+// ---- hand state ----
+const H = { left:null, right:null };
+function onResults(res){
+  const list = res.multiHandLandmarks || [];
+  let L=null,R=null;
+  if(list.length===1){ const mx=1-list[0][0].x; if(mx<0.5) L=list[0]; else R=list[0]; }
+  else if(list.length>=2){ const a=list.map(h=>({h,mx:1-h[0].x})).sort((p,q)=>p.mx-q.mx); L=a[0].h; R=a[a.length-1].h; }
+  H.left=L; H.right=R;
+}
+function initHands(){
+  const cam=document.getElementById('cam');
+  const hands=new Hands({ locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  hands.setOptions({ maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.6, minTrackingConfidence:0.6 });
+  hands.onResults(onResults);
+  const camera=new Camera(cam,{ onFrame:async()=>{ await hands.send({image:cam}); }, width:640, height:480 });
+  camera.start();
+}
+
+// ---- canvas / mapping ----
+const cvs=document.getElementById('c'), ctx=cvs.getContext('2d');
+const dpr=Math.min(2, window.devicePixelRatio||1);
+function resize(){ cvs.width=innerWidth*dpr; cvs.height=innerHeight*dpr; cvs.style.width=innerWidth+'px'; cvs.style.height=innerHeight+'px'; ctx.setTransform(dpr,0,0,dpr,0,0); }
+addEventListener('resize', resize); resize();
+let _camEl=null;
+function mapPt(lm){ if(!_camEl)_camEl=document.getElementById('cam');
+  const vw=_camEl?.videoWidth||16, vh=_camEl?.videoHeight||9, W=innerWidth, H2=innerHeight;
+  const s=Math.max(W/vw,H2/vh), dw=vw*s, dh=vh*s;
+  return [W-(lm.x*dw-(dw-W)/2), lm.y*dh-(dh-H2)/2];
+}
+function segFromAngle(a,n){ let rel=(a-START)%TWO_PI; if(rel<0)rel+=TWO_PI; return Math.floor(rel/(TWO_PI/n))%n; }
+function pickSeg(a,n,st,dt){ const c=segFromAngle(a,n); if(c===st.cand) st.t+=dt; else {st.cand=c; st.t=0;} if(st.t>=0.1) st.seg=st.cand; return st.seg; }
+const rootSel={seg:0,cand:0,t:0}, qualSel={seg:0,cand:0,t:0};
+function pinchOf(lm){ return d2(lm[4],lm[8]) < 0.06; }
+// smoothed hand point (palm) so the aim doesn't jitter between slices
+const shL={x:0,y:0,on:false}, shR={x:0,y:0,on:false};
+function smoothHand(lm, s){ const [x,y]=mapPt(lm[9]); if(!s.on){s.x=x;s.y=y;s.on=true;} else {s.x+=(x-s.x)*0.35; s.y+=(y-s.y)*0.35;} return [s.x,s.y]; }
+
+// ---- drawing ----
+function drawSkeleton(lm, col){
+  ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=2.4; ctx.lineCap="round"; ctx.shadowColor=col; ctx.shadowBlur=14;
+  for(const [a,b] of HC){ const [x1,y1]=mapPt(lm[a]),[x2,y2]=mapPt(lm[b]); ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
+  for(let i=0;i<lm.length;i++){ const big=TIPS.includes(i); const [x,y]=mapPt(lm[i]);
+    ctx.fillStyle=big?"#ffffff":col; ctx.shadowBlur=big?16:6; ctx.beginPath(); ctx.arc(x,y,big?4:2.5,0,TWO_PI); ctx.fill(); }
+  ctx.restore();
+}
+function drawWheel(cx, cy, R, items, sel, col, active, present){
+  const n=items.length, seg=TWO_PI/n;
+  ctx.save(); ctx.globalAlpha = present ? 1 : 0.4;
+  if(active){ ctx.beginPath(); ctx.arc(cx,cy,R+11,0,TWO_PI); ctx.strokeStyle=col; ctx.lineWidth=4; ctx.shadowColor=col; ctx.shadowBlur=36; ctx.stroke(); ctx.shadowBlur=0; }
+  for(let i=0;i<n;i++){
+    const a0=START+i*seg, a1=a0+seg, on=i===sel;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a0,a1); ctx.closePath();
+    ctx.fillStyle= on ? col : "rgba(10,20,32,.32)"; ctx.shadowColor=col; ctx.shadowBlur=on?30:0; ctx.fill(); ctx.shadowBlur=0;
+    ctx.strokeStyle="rgba(150,225,255,.28)"; ctx.lineWidth=1; ctx.stroke();
+    const am=a0+seg/2, lr=R*0.76, lx=cx+Math.cos(am)*lr, ly=cy+Math.sin(am)*lr;
+    ctx.fillStyle=on?"#05121c":"#dbf2ff"; ctx.font=on?"800 22px Helvetica":"800 17px Helvetica";
+    ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(items[i], lx, ly);
+  }
+  // hub
+  ctx.beginPath(); ctx.arc(cx,cy,R*0.30,0,TWO_PI); ctx.fillStyle="rgba(4,10,18,.88)"; ctx.strokeStyle=col; ctx.lineWidth=2.5;
+  ctx.shadowColor=col; ctx.shadowBlur=active?30:16; ctx.fill(); ctx.stroke(); ctx.shadowBlur=0;
+  ctx.fillStyle=active?col:"#9fd0e0"; ctx.font="800 11px Helvetica"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText(active?"LOCKED":"AIM", cx, cy-14);
+  ctx.fillStyle=col; ctx.font="800 26px Helvetica"; ctx.fillText(items[sel], cx, cy+9);
+  ctx.restore();
+}
+
+let liveRoot=0, liveQual=0, _lastT=performance.now();
+function frame(){
+  requestAnimationFrame(frame);
+  const now=performance.now(), dt=(now-_lastT)/1000; _lastT=now;
+  ctx.clearRect(0,0,innerWidth,innerHeight);
+
+  // big anchored wheels (sit above the hands like the reel); slice in your hand's DIRECTION is selected
+  const LW=[innerWidth*0.25, innerHeight*0.42], RW=[innerWidth*0.75, innerHeight*0.42], R=Math.min(210, innerHeight*0.26);
+  const lp = !!(H.left && pinchOf(H.left)), rp = !!(H.right && pinchOf(H.right));
+
+  if(H.left){ const lh=smoothHand(H.left,shL); if(!lp) liveRoot=pickSeg(Math.atan2(lh[1]-LW[1], lh[0]-LW[0]),ROOTS.length,rootSel,dt); drawSkeleton(H.left,"#5fe6ff"); } else shL.on=false;
+  drawWheel(LW[0],LW[1],R,ROOTS,liveRoot,"#5fe6ff",lp,!!H.left);
+  if(H.right){ const rh=smoothHand(H.right,shR); if(!rp) liveQual=pickSeg(Math.atan2(rh[1]-RW[1], rh[0]-RW[0]),QUAL.length,qualSel,dt); drawSkeleton(H.right,"#ff7be5"); } else shR.on=false;
+  drawWheel(RW[0],RW[1],R,QUAL.map(q=>q.name),liveQual,"#ff7be5",rp,!!H.right);
+
+  // pinch = STRIKE the chord (like pressing a key); it rings out so you can jump to the next chord with another pinch
+  const nowPinch = lp || rp;
+  if(nowPinch && !window._p) strum(liveRoot, liveQual);
+  window._p = nowPinch;
+
+  // chord readout (— when either wheel is OFF)
+  const off = SCALE[liveRoot]==null || !QUAL[liveQual].iv;
+  const name = off ? "—" : ROOTS[liveRoot] + QUAL[liveQual].sym;
+  ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+  ctx.fillStyle = nowPinch ? "#ff7be5" : "rgba(180,235,255,.85)"; ctx.shadowColor = nowPinch ? "#ff7be5" : "#5fe6ff"; ctx.shadowBlur=26;
+  ctx.font="900 64px Helvetica"; ctx.fillText(name, innerWidth/2, 92); ctx.shadowBlur=0;
+  ctx.fillStyle = ready ? "#7fb6c8" : "#ffd36e"; ctx.font="12px Helvetica";
+  ctx.fillText(ready ? (nowPinch ? "▶ STRUCK" : "🤏 pinch to play") : "LOADING PIANO…", innerWidth/2, 116);
+  // transpose readout
+  ctx.fillStyle="#9fc6d8"; ctx.font="12px Helvetica";
+  ctx.fillText("TRANSPOSE "+(transpose>=0?"+":"")+transpose+" st   ·   ↑↓ octave · [ ] semitone · 0 reset", innerWidth/2, 138);
+}
+
+document.getElementById('go').addEventListener('click', async ()=>{
+  await Tone.start(); buildAudio();
+  document.getElementById('start').classList.add('hide');
+  try{ initHands(); }catch(e){ console.warn(e); }
+  frame();
+});
+
+// transpose controls (keyboard)
+addEventListener('keydown', e=>{
+  if(e.key==='ArrowUp') transpose=Math.min(24, transpose+12);
+  else if(e.key==='ArrowDown') transpose=Math.max(-24, transpose-12);
+  else if(e.key===']'||e.key==='=') transpose=Math.min(24, transpose+1);
+  else if(e.key==='['||e.key==='-') transpose=Math.max(-24, transpose-1);
+  else if(e.key==='0') transpose=0;
+});
+</script>
+</body>
+</html>

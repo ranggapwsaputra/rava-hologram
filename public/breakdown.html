@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Blank Space Breakdown · hand-tracked holographic OS</title>
+<style>
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  :root{ --bg:#05080d; --card:#0c121a; --line:#1b2530; --ink:#e9f1f6; --mut:#8da3b0; --cy:#5fe6ff; --mag:#ff7be5; }
+  html{ scroll-behavior:smooth; }
+  body{ background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Arial,sans-serif; line-height:1.6;
+    background-image:radial-gradient(120% 60% at 50% -10%, rgba(95,230,255,.10), transparent 60%); }
+  .wrap{ max-width:700px; margin:0 auto; padding:0 22px 90px; }
+  header{ padding:60px 0 26px; text-align:center; }
+  .kick{ color:var(--cy); font-size:12px; letter-spacing:.34em; font-weight:800; }
+  h1{ font-size:clamp(34px,8vw,60px); font-weight:900; letter-spacing:-.02em; line-height:1.02; margin:14px 0 10px; }
+  h1 b{ color:var(--cy); }
+  .by{ color:var(--mut); font-size:14px; }
+  .lede{ opacity:.86; font-size:16px; margin:20px auto 0; max-width:560px; }
+  .pill{ margin:26px auto 0; display:inline-flex; align-items:center; gap:10px;
+    background:linear-gradient(180deg, rgba(95,230,255,.16), rgba(95,230,255,.05));
+    border:1px solid rgba(95,230,255,.4); color:#dffbff; font-weight:800; font-size:14px; padding:12px 22px; border-radius:50px;
+    box-shadow:0 0 30px rgba(95,230,255,.18); }
+  .pill b{ color:var(--cy); }
+  .stack{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:26px 0 0; }
+  .chip{ font-size:11px; font-weight:800; letter-spacing:.06em; color:#bfe7ff; background:var(--card);
+    border:1px solid var(--line); border-radius:30px; padding:7px 13px; }
+  .step{ margin-top:52px; }
+  .snum{ color:var(--cy); font-size:13px; font-weight:800; letter-spacing:.2em; }
+  .step h2{ font-size:clamp(23px,5.2vw,32px); font-weight:900; margin:6px 0 4px; letter-spacing:-.01em; }
+  .step p{ opacity:.84; font-size:15px; margin:10px 0; }
+  .box{ position:relative; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin:16px 0; }
+  .box .lbl{ color:var(--mut); font-size:10px; letter-spacing:.18em; font-weight:800; text-transform:uppercase; margin-bottom:8px; }
+  .box code{ display:block; color:#cfeef2; font-family:"SFMono-Regular",ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.7; white-space:pre-wrap; }
+  .box code .v{ color:var(--mag); }
+  .why{ background:rgba(255,123,229,.05); border-left:2px solid var(--mag); border-radius:0 10px 10px 0; padding:14px 16px; margin:16px 0; }
+  .why .h{ color:var(--mag); font-size:12px; font-weight:800; letter-spacing:.1em; margin-bottom:8px; }
+  .why ul{ list-style:none; } .why li{ opacity:.85; font-size:13.5px; padding:3px 0 3px 18px; position:relative; }
+  .why li::before{ content:"▸"; color:var(--cy); position:absolute; left:0; }
+  .apps{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:18px 0; }
+  .app{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:15px; }
+  .app h3{ font-size:15px; color:#eaffff; margin-bottom:4px; }
+  .app .g{ font-size:12px; color:var(--cy); font-weight:700; }
+  .app p{ font-size:12.5px; opacity:.72; margin:6px 0 0; }
+  .app.soon{ opacity:.62; } .app.soon .g{ color:var(--mag); }
+  footer{ margin-top:60px; text-align:center; border-top:1px solid var(--line); padding-top:40px; }
+  footer .cta{ display:inline-block; background:linear-gradient(180deg,#9af,#5fe6ff 60%,#2aa8ff); color:#03222a; font-weight:900;
+    letter-spacing:.06em; font-size:15px; padding:15px 30px; border-radius:50px; text-decoration:none; box-shadow:0 10px 30px rgba(95,230,255,.3); }
+  footer .tag{ color:var(--mut); font-size:13px; letter-spacing:.18em; margin-top:22px; } footer .tag b{ color:var(--cy); }
+  a{ color:var(--cy); }
+  @media(max-width:520px){ .apps{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kick">BLANK SPACE OS · BUILD BREAKDOWN</div>
+    <h1>The <b>Blank Space</b> Breakdown</h1>
+    <div class="by">a hand-tracked holographic OS · built with Claude Code</div>
+    <p class="lede">A webcam-driven, Iron-Man-inspired playground you control with your hands — a place to vent, play, and unwind when you're burned out. No mouse, no keyboard: point, pinch, swipe, and fist.</p>
+    <div class="pill">🖐️ Everything below runs on <b>one webcam</b> + MediaPipe Hands</div>
+    <div class="stack">
+      <span class="chip">React + Vite</span><span class="chip">React-Three-Fiber</span><span class="chip">MediaPipe Hands</span>
+      <span class="chip">Tone.js</span><span class="chip">Canvas 2D</span><span class="chip">Howler</span>
+    </div>
+  </header>
+
+  <section class="step">
+    <div class="snum">01 · THE CORE</div>
+    <h2>One camera, two hands, zero clicks</h2>
+    <p>A single <code>getUserMedia</code> feed runs <b>MediaPipe Hands</b> (2 hands, modelComplexity 1). Left/right is decided by on-screen X <em>after mirroring</em> — not MediaPipe's handedness label. A shared gesture state (<code>point · grab · pinch · open</code>) drives every app, so there's only ever one camera and one tracker.</p>
+    <div class="why"><div class="h">THE GESTURE VOCABULARY</div><ul>
+      <li><b>Pinch + drag</b> → spin the app carousel</li>
+      <li><b>Point + dwell</b> → open / play (a ring charges so it never misfires)</li>
+      <li><b>✊ Hold a fist</b> → exit an app</li>
+      <li><b>Open palm</b> → enter from the loading screen</li>
+    </ul></div>
+  </section>
+
+  <section class="step">
+    <div class="snum">02 · THE APPS</div>
+    <h2>Six hands-free toys</h2>
+    <div class="apps">
+      <div class="app"><h3>🎵 Music</h3><div class="g">pinch-spin · point to play/pause</div><p>A 3D carousel of real tracks with live album art (iTunes API), played through one looping audio element.</p></div>
+      <div class="app"><h3>🤖 Interactive 3D</h3><div class="g">move your hand</div><p>A holographic robot you nudge around in R3F space.</p></div>
+      <div class="app"><h3>🎛️ Gesture FX</h3><div class="g">CDJ-style hand FX</div><p>A two-handed audio-FX rig: right-Y = filter, hand openness = delay/echo, hands apart = flanger, both fists = roll. Effects tap the unfiltered signal so they're always audible.</p></div>
+      <div class="app"><h3>🎹 Chord Lab</h3><div class="g">aim a wheel · pinch to play</div><p>Two anchored wheels (root + quality) you aim with your hands; pinch strikes a real grand-piano chord (Salamander samples). Arrow keys transpose.</p></div>
+      <div class="app"><h3>😂 Meme of the Day</h3><div class="g">point &amp; hold for next</div><p>Pulls a random meme from a CORS-friendly Reddit API, in a glowing holo frame.</p></div>
+      <div class="app soon"><h3>🎨 Air Canvas</h3><div class="g">coming soon</div><p>Doodle glowing light in the air — and turn each stroke into a grab-and-throw physics object. The next drop.</p></div>
+    </div>
+  </section>
+
+  <section class="step">
+    <div class="snum">03 · THE GESTURE-FX PROMPT</div>
+    <h2>The spec that started the rig</h2>
+    <p>Gesture FX began as one detailed brief — a CDJ-style, two-handed audio-FX rig. The shape of that prompt:</p>
+    <div class="box"><div class="lbl">Prompt · core idea</div><code>Build a <span class="v">CDJ-style hand-gesture audio FX rig</span> using MediaPipe Hands + Tone.js.
+Track both hands; decide left/right by on-screen X after mirroring.
+
+Effects sit on <span class="v">parallel sends</span> (wet=1), controlled by per-effect send-gains:
+  filter (HP/LP isolator) · echo · delay · reverb · flanger · roll
+
+Map: right-Y → filter · right openness → delay · left-Y → reverb
+     left openness → echo · hand distance → flanger · both fists → roll
+
+CRITICAL: when a hand leaves frame, hard-gate its targets to neutral/0
+so the FX don't blast when nothing's in view.</code></div>
+    <div class="why"><div class="h">HARD-WON LESSONS</div><ul>
+      <li>Canvas must set its <b>CSS size</b> to the viewport, or DPR offsets every drawing by 2×.</li>
+      <li>Map landmarks <b>object-cover-correct</b> so the skeleton lands on the webcam.</li>
+      <li>Effects belong on the <b>unfiltered</b> signal — otherwise the filter silences them.</li>
+      <li>YouTube FX needs a tab-audio share permission (browsers can't read an iframe's audio) — built-in tracks are the frictionless path.</li>
+    </ul></div>
+  </section>
+
+  <section class="step">
+    <div class="snum">04 · RUN IT YOURSELF</div>
+    <h2>Setup in 3 commands</h2>
+    <div class="box"><div class="lbl">Terminal</div><code>git clone https://github.com/sharonxu-wav/blank-space.git
+cd blank-space
+npm install
+npm run dev      <span class="v"># open the printed localhost URL, allow camera</span></code></div>
+    <p>Needs <b>Chrome or Edge</b> and a webcam. Build for production with <code>npm run build</code> (output in <code>dist/</code>). Tip: <code>?windows</code> swaps the carousel for a draggable floating-window menu.</p>
+  </section>
+
+  <footer>
+    <a class="cta" href="https://github.com/sharonxu-wav/blank-space">▸ Open Blank Space on GitHub</a>
+    <div class="tag">DJ <b>sharonxu</b> · build-reel #6 · made with Claude Code</div>
+  </footer>
+</div>
+</body>
+</html>
