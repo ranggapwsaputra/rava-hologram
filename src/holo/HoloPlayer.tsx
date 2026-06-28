@@ -23,6 +23,8 @@ import { resumeAudio } from "./audio";
 import { powerOn } from "./boot";
 import { appView } from "./appStore";
 import GlobalVoiceAgent from "./GlobalVoiceAgent";
+import { onClap, onStatusChange } from "./voiceBridge";
+import type { } from "./voiceBridge";
 
 let _lastX = 0.5, _lastY = 0.5;
 const d2 = (a: any, b: any) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -50,9 +52,13 @@ export default function HoloPlayer() {
   const [started, setStarted] = useState(false);
   const [booting, setBooting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [wsStatus, setWsStatus] = useState<"connecting" | "ready" | "disconnected">("disconnected");
   const startedRef = useRef(false);
   const trackingRef = useRef(false);
   const view = useSyncExternalStore(appView.sub, appView.get);
+
+  // Subscribe to WS status so standby screen shows live connection state
+  useEffect(() => onStatusChange(setWsStatus), []);
 
   // Subscribe to news items (written by NewsApp outside Canvas, read here + passed to NewsCarousel)
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
@@ -90,9 +96,21 @@ export default function HoloPlayer() {
     setStarted(true);
   }
 
-  // Skip the ENTER screen — boot straight into the initiation sequence on load.
-  // Camera + hand-tracking start in parallel and come up during the boot animation.
-  useEffect(() => { startTracking(); enter(); }, []);
+  // Standby mode by default. Subscribe to acoustic double-clap trigger from voice agent.
+  // Use refs to avoid stale closures in the onClap callback.
+  const enterRef = useRef(enter);
+  enterRef.current = enter;
+  const startTrackingRef = useRef(startTracking);
+  startTrackingRef.current = startTracking;
+
+  useEffect(() => {
+    const unsubscribe = onClap(() => {
+      console.info("[HoloPlayer] Acoustic double-clap detected! Waking up R.A.V.A OS...");
+      startTrackingRef.current();
+      enterRef.current();
+    });
+    return unsubscribe;
+  }, []);
 
   // Web Audio starts suspended without a user gesture — resume on the first interaction.
   useEffect(() => {
@@ -179,10 +197,10 @@ export default function HoloPlayer() {
       {started && view !== "gesturefx" && view !== "chordlab" && <HandFX />}
 
       <Canvas camera={{ position: [0, 0, 0.12], fov: 74 }} dpr={[1, 2]} gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }} className="absolute inset-0 z-10">
-        {!WINDOW_MENU && view === "home"  && <Home />}
+        {!WINDOW_MENU && view === "home" && <Home />}
         {view === "music" && <MusicApp />}
-        {view === "news"  && <NewsCarousel items={newsItems} />}
-        {view === "meme"  && <MemeGallery memes={memeItems} />}
+        {view === "news" && <NewsCarousel items={newsItems} />}
+        {view === "meme" && <MemeGallery memes={memeItems} />}
       </Canvas>
 
       {started && WINDOW_MENU && view === "home" && <WindowMenu />}
@@ -190,7 +208,7 @@ export default function HoloPlayer() {
       {booting && <BootSequence onDone={() => setBooting(false)} />}
       {started && <HudChrome />}
       {started && <Overlay view={view} />}
-      {started && view !== "robot" && view !== "news" && <GlobalVoiceAgent />}
+      {started && <GlobalVoiceAgent />}
 
       {started && view === "robot" && <RobotApp />}
       {started && view === "meme" && <MemeApp />}
@@ -198,10 +216,200 @@ export default function HoloPlayer() {
       {started && view === "chordlab" && <ChordLabApp />}
       {started && view === "news" && <NewsApp />}
 
+      {!started && (
+        <div
+          className="absolute inset-0 z-50 select-none overflow-hidden"
+          style={{ cursor: "default", background: "radial-gradient(ellipse at 50% 60%, #020b18 0%, #000508 55%, #000 100%)" }}
+        >
+          {/* ── Holographic grid background ── */}
+          <div style={{
+            position: "absolute", inset: 0, opacity: .18,
+            backgroundImage: "linear-gradient(rgba(0,212,255,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,.5) 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+            animation: "orb-grid-scroll 8s linear infinite",
+          }} />
+
+          {/* ── Scan line ── */}
+          <div style={{
+            position: "absolute", left: 0, right: 0, height: "2px",
+            background: "linear-gradient(90deg, transparent, rgba(0,212,255,.45), rgba(160,80,255,.35), transparent)",
+            animation: "orb-scan 5s linear infinite", zIndex: 2,
+          }} />
+
+          {/* ── Corner HUD brackets ── */}
+          {[["top:18px;left:18px;borderRight:0;borderBottom:0", "tl"], ["top:18px;right:18px;borderLeft:0;borderBottom:0", "tr"], ["bottom:18px;left:18px;borderRight:0;borderTop:0", "bl"], ["bottom:18px;right:18px;borderLeft:0;borderTop:0", "br"]].map(([s, k]) => (
+            <div key={k} style={{ position: "absolute", width: 28, height: 28, border: "1.5px solid rgba(0,212,255,.45)", ...Object.fromEntries((s as string).split(";").filter(Boolean).map(p => { const [a, b] = p.split(":"); return [a.trim(), b.trim()]; })) }} />
+          ))}
+
+          {/* ── Telemetry readout top-left ── */}
+          <div style={{ position: "absolute", top: 22, left: 56, fontFamily: "monospace", fontSize: 9, letterSpacing: ".22em", color: "rgba(0,212,255,.6)", animation: "orb-flicker 6s infinite" }}>
+            R.A.V.A OS · MODE STANDBY
+          </div>
+          <div style={{ position: "absolute", top: 32, left: 56, fontFamily: "monospace", fontSize: 8, letterSpacing: ".18em", color: "rgba(0,212,255,.35)" }}>
+            ACOUSTIC SENSOR ACTIVE
+          </div>
+
+          {/* ── Telemetry readout top-right ── */}
+          <div style={{ position: "absolute", top: 22, right: 56, fontFamily: "monospace", fontSize: 9, letterSpacing: ".22em", color: "rgba(160,80,255,.7)", textAlign: "right", animation: "orb-data-blink 2.4s ease-in-out infinite" }}>
+            CLAP DETECTION: ON
+          </div>
+
+          {/* ── Main ORBS stage (centered) ── */}
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+
+            {/* Orbs container */}
+            <div style={{ position: "relative", width: 520, height: 520, display: "flex", alignItems: "center", justifyContent: "center" }}>
+
+              {/* ── Outer ring 3 (slowest, dashed) ── */}
+              <div style={{
+                position: "absolute", width: 490, height: 490, borderRadius: "50%",
+                border: "1px dashed rgba(0,212,255,.12)",
+                animation: "orb-ring-cw 40s linear infinite",
+              }} />
+
+              {/* ── Outer ring 2 ── */}
+              <div style={{
+                position: "absolute", width: 420, height: 420, borderRadius: "50%",
+                border: "1px solid rgba(110,55,255,.2)",
+                boxShadow: "0 0 30px rgba(110,55,255,.06) inset",
+                animation: "orb-ring-ccw 28s linear infinite",
+              }} />
+
+              {/* ── Outer ring 1 ── */}
+              <div style={{
+                position: "absolute", width: 340, height: 340, borderRadius: "50%",
+                border: "1px solid rgba(0,212,255,.22)",
+                boxShadow: "0 0 40px rgba(0,212,255,.08) inset",
+                animation: "orb-ring-cw 18s linear infinite",
+              }} />
+
+              {/* ── Mid ring ── */}
+              <div style={{
+                position: "absolute", width: 260, height: 260, borderRadius: "50%",
+                border: "1.5px solid rgba(0,212,255,.35)",
+                boxShadow: "0 0 50px rgba(0,212,255,.12) inset, 0 0 25px rgba(0,212,255,.12)",
+                animation: "orb-ring-ccw 12s linear infinite",
+              }} />
+
+              {/* ── Inner ring ── */}
+              <div style={{
+                position: "absolute", width: 160, height: 160, borderRadius: "50%",
+                border: "1px solid rgba(160,80,255,.5)",
+                boxShadow: "0 0 30px rgba(160,80,255,.15) inset",
+                animation: "orb-ring-cw 7s linear infinite",
+              }} />
+
+              {/* ── Orbiting orb 1 — cyan, orbit r=120 ── */}
+              <div style={{ position: "absolute", width: 0, height: 0, animation: "orb-orbit-1 8s linear infinite" }}>
+                <div style={{
+                  width: 18, height: 18, borderRadius: "50%", marginLeft: -9, marginTop: -9,
+                  background: "radial-gradient(circle, #fff 10%, #00d4ff 50%, rgba(0,180,255,.2) 100%)",
+                  boxShadow: "0 0 18px 6px rgba(0,212,255,.9), 0 0 40px 12px rgba(0,212,255,.4)",
+                  animation: "orb-float 3.2s ease-in-out infinite",
+                }} />
+              </div>
+
+              {/* ── Orbiting orb 2 — violet, orbit r=165 ── */}
+              <div style={{ position: "absolute", width: 0, height: 0, animation: "orb-orbit-2 13s linear infinite" }}>
+                <div style={{
+                  width: 14, height: 14, borderRadius: "50%", marginLeft: -7, marginTop: -7,
+                  background: "radial-gradient(circle, #fff 8%, #a855f7 55%, rgba(160,60,255,.2) 100%)",
+                  boxShadow: "0 0 14px 5px rgba(168,85,247,.9), 0 0 32px 10px rgba(168,85,247,.4)",
+                  animation: "orb-float 4.1s ease-in-out .8s infinite",
+                }} />
+              </div>
+
+              {/* ── Orbiting orb 3 — gold, orbit r=205 ── */}
+              <div style={{ position: "absolute", width: 0, height: 0, animation: "orb-orbit-3 18s linear infinite" }}>
+                <div style={{
+                  width: 12, height: 12, borderRadius: "50%", marginLeft: -6, marginTop: -6,
+                  background: "radial-gradient(circle, #fff 8%, #fbbf24 55%, rgba(251,180,36,.2) 100%)",
+                  boxShadow: "0 0 12px 4px rgba(251,191,36,.9), 0 0 28px 9px rgba(251,191,36,.4)",
+                  animation: "orb-float 2.8s ease-in-out 1.6s infinite",
+                }} />
+              </div>
+
+              {/* ── Orbiting orb 4 — teal, orbit r=148 ── */}
+              <div style={{ position: "absolute", width: 0, height: 0, animation: "orb-orbit-4 10s linear infinite reverse" }}>
+                <div style={{
+                  width: 10, height: 10, borderRadius: "50%", marginLeft: -5, marginTop: -5,
+                  background: "radial-gradient(circle, #fff 8%, #2dd4bf 55%, rgba(45,212,191,.2) 100%)",
+                  boxShadow: "0 0 10px 4px rgba(45,212,191,.9), 0 0 24px 8px rgba(45,212,191,.4)",
+                  animation: "orb-float 5s ease-in-out 2s infinite",
+                }} />
+              </div>
+
+              {/* ── Orbiting orb 5 — pink, orbit r=238 ── */}
+              <div style={{ position: "absolute", width: 0, height: 0, animation: "orb-orbit-5 22s linear infinite" }}>
+                <div style={{
+                  width: 9, height: 9, borderRadius: "50%", marginLeft: -4.5, marginTop: -4.5,
+                  background: "radial-gradient(circle, #fff 8%, #f472b6 55%, rgba(244,114,182,.2) 100%)",
+                  boxShadow: "0 0 9px 3px rgba(244,114,182,.9), 0 0 22px 7px rgba(244,114,182,.4)",
+                  animation: "orb-float 3.6s ease-in-out .4s infinite",
+                }} />
+              </div>
+
+              {/* ── Orbiting orb 6 — orange, orbit r=185 ── */}
+              <div style={{ position: "absolute", width: 0, height: 0, animation: "orb-orbit-6 15s linear infinite reverse" }}>
+                <div style={{
+                  width: 11, height: 11, borderRadius: "50%", marginLeft: -5.5, marginTop: -5.5,
+                  background: "radial-gradient(circle, #fff 8%, #fb923c 55%, rgba(251,146,60,.2) 100%)",
+                  boxShadow: "0 0 11px 4px rgba(251,146,60,.9), 0 0 26px 8px rgba(251,146,60,.4)",
+                  animation: "orb-float 4.4s ease-in-out 1.2s infinite",
+                }} />
+              </div>
+
+              {/* ── CORE orb (RAVA center) ── */}
+              <div style={{
+                width: 90, height: 90, borderRadius: "50%",
+                background: "radial-gradient(circle at 38% 35%, rgba(255,255,255,.95) 0%, #40e0ff 20%, #0099dd 45%, #5522cc 75%, #220055 100%)",
+                animation: "orb-core-pulse 3s ease-in-out infinite",
+                position: "relative", zIndex: 5, display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {/* Core inner glow shimmer */}
+                <div style={{
+                  width: 36, height: 36, borderRadius: "50%",
+                  background: "radial-gradient(circle, rgba(255,255,255,.9), rgba(180,230,255,.5) 60%, transparent)",
+                  boxShadow: "0 0 16px 6px rgba(255,255,255,.6)",
+                }} />
+              </div>
+            </div>
+
+            {/* ── R.A.V.A logo + tagline ── */}
+            <div style={{ marginTop: 28, textAlign: "center", position: "relative", zIndex: 6 }}>
+              <div style={{
+                fontFamily: "monospace", fontSize: 11, letterSpacing: ".45em", fontWeight: 900, textTransform: "uppercase",
+                color: "rgba(0,212,255,.6)", marginBottom: 8, animation: "orb-data-blink 3s ease-in-out infinite",
+              }}>
+                SYSTEM IN STANDBY MODE
+              </div>
+
+              {/* ── Live WS status ── */}
+              <div style={{ marginTop: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <span style={{
+                  width: 7, height: 7, borderRadius: "50%", display: "inline-block",
+                  background: wsStatus === "ready" ? "#4ade80" : wsStatus === "connecting" ? "#facc15" : "#f87171",
+                  boxShadow: wsStatus === "ready" ? "0 0 10px #4ade80, 0 0 20px rgba(74,222,128,.4)" : wsStatus === "connecting" ? "0 0 10px #facc15" : "0 0 10px #f87171",
+                  animation: wsStatus === "ready" ? "orb-data-blink 2s infinite" : "none",
+                }} />
+                <span style={{
+                  fontFamily: "monospace", fontSize: 9, letterSpacing: ".18em", textTransform: "uppercase",
+                  color: wsStatus === "ready" ? "#4ade80" : wsStatus === "connecting" ? "#facc15" : "#f87171"
+                }}>
+                  {wsStatus === "ready" ? "AGENT R.A.V.A ONLINE" : wsStatus === "connecting" ? "CONNECTING TO AGENT…" : "AGENT OFFLINE — RUN: python jarvis.py"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {err && (
-        <div style={{ position: "absolute", bottom: 18, left: "50%", transform: "translateX(-50%)", zIndex: 60,
+        <div style={{
+          position: "absolute", bottom: 18, left: "50%", transform: "translateX(-50%)", zIndex: 60,
           color: "#9fe8ff", background: "rgba(2,8,14,.72)", border: "1px solid rgba(95,230,255,.3)",
-          borderRadius: 20, padding: "8px 16px", fontSize: 13, letterSpacing: ".04em" }}>{err} ✋</div>
+          borderRadius: 20, padding: "8px 16px", fontSize: 13, letterSpacing: ".04em"
+        }}>{err} ✋</div>
       )}
     </div>
   );

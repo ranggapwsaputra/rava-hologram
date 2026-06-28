@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { hand, ui } from "../handState";
 import { newsRig, newsPlayer, wrapN, accentOfNews, emojiOfNews, fmtDateShort, cleanAnalisa, type NewsItem } from "../newsStore";
 import { fx, startThrow, endThrow, appView } from "../appStore";
-import { speak } from "../ravaVoice";
+import { speak } from "../voiceBridge";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const R = 5.8;                // carousel radius (wider than music for bigger cards)

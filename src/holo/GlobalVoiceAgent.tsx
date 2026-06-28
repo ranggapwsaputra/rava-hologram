@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { appView } from "./appStore";
 import { askRava } from "./ravaAi";
 import type { ChatMessage } from "./ravaAi";
-import { speak } from "./ravaVoice";
+import { speak } from "./voiceBridge";
 import { toggleTrack, pauseTrack, playTrack, isPlaying } from "./audio";
 import { tracks } from "./tracks";
 import { player, seekCarousel } from "./store";
@@ -16,10 +16,7 @@ import { player, seekCarousel } from "./store";
 const SpeechRecognition =
   (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-// ─── Wake-word detector ─────────────────────────────────────────────────────
-// Returns null when nothing matched; returns a view key when we should navigate;
-// returns "music:play", "music:pause", "music:next", "music:prev", "music:track:N" for playback;
-// returns "ai" when the user seems to want a full JARVIS AI conversation.
+
 function detectCommand(text: string): string | null {
   const q = text.toLowerCase();
 
@@ -142,12 +139,16 @@ function handleMusicPlayback(cmd: string): { said: string; nav?: string } {
 // ─── Status pill shown on dashboard ─────────────────────────────────────────
 type State = "idle" | "listening" | "thinking" | "speaking";
 
-export default function GlobalVoiceAgent() {
+export default function GlobalVoiceAgent({ standbyOnly = false }: { standbyOnly?: boolean } = {}) {
   const recRef = useRef<any>(null);
   const [state, setState] = useState<State>("idle");
   const [transcript, setTranscript] = useState("");
   const historyRef = useRef<ChatMessage[]>([]);
   const listeningRef = useRef(false);
+  // AbortController for the in-flight AI request — cancelled when new speech arrives
+  const abortRef = useRef<AbortController | null>(null);
+  // Guard against overlapping parallel AI calls
+  const isProcessingRef = useRef(false);
 
   const startListening = () => {
     if (!recRef.current || listeningRef.current) return;
@@ -155,10 +156,14 @@ export default function GlobalVoiceAgent() {
   };
 
   useEffect(() => {
+    // In standbyOnly mode: we don't start voice recognition.
+    // The component exists so voiceBridge (imported at module level) stays
+    // connected and can receive clap_detected events from the Python agent.
+    if (standbyOnly) return;
     if (!SpeechRecognition) return;
 
     const rec = new SpeechRecognition();
-    rec.continuous = false;
+    rec.continuous = true;
     rec.interimResults = false;
     rec.lang = "id-ID";
     recRef.current = rec;
@@ -170,67 +175,76 @@ export default function GlobalVoiceAgent() {
 
     rec.onend = () => {
       listeningRef.current = false;
-      setState(s => s === "listening" ? "idle" : s);
-      // Keep listening continuously when idle
+      // Reset to idle if stuck in thinking/speaking (e.g. AI call failed silently)
+      setState(s => (s === "listening" || s === "thinking") ? "idle" : s);
+      // Keep mic alive
       setTimeout(startListening, 400);
     };
 
-    rec.onerror = () => {
+    rec.onerror = (err: any) => {
       listeningRef.current = false;
+      // Ignore no-speech errors — they're normal pauses, not real errors
+      if (err?.error === "no-speech") {
+        setTimeout(startListening, 400);
+        return;
+      }
       setState("idle");
+      isProcessingRef.current = false;
       setTimeout(startListening, 1500);
     };
 
     rec.onresult = async (e: any) => {
-      const text: string = e.results[0][0].transcript;
+      // With continuous=true, use the latest result index (not always 0)
+      const latest = e.results[e.results.length - 1];
+      const text: string = latest[0].transcript;
       setTranscript(text);
 
       const cmd = detectCommand(text);
-      if (!cmd) return; // not a wake word — ignore
 
-      // === Music playback commands ===
-      if (cmd.startsWith("music:")) {
+      // === Music playback commands — instant, no AI needed ===
+      if (cmd?.startsWith("music:")) {
         const result = handleMusicPlayback(cmd);
-        setState("speaking");
-        speak(result.said, () => {
-          setState("idle");
-          if (result.nav) appView.set(result.nav as any);
-        });
+        if (result.nav) appView.set(result.nav as any);
         return;
       }
 
-      // === Direct navigation commands ===
+      // === Direct navigation commands — instant, no AI needed ===
       const navMap: Record<string, string> = {
         music: "music", gesturefx: "gesturefx",
         chordlab: "chordlab", meme: "meme",
         news: "news", robot: "robot", home: "home"
       };
-
-      if (cmd !== "ai" && navMap[cmd]) {
-        const label: Record<string, string> = {
-          music: "Membuka pemutar musik, Om.",
-          gesturefx: "Mengaktifkan modul Gesture FX, Om.",
-          chordlab: "Membuka Chord Lab, Om.",
-          meme: "Menampilkan Meme of the Day, Om.",
-          news: "Membuka News Feed, Om. Pilih Berita, Saham, atau Kurs Rupiah.",
-          robot: "Membuka RAVA Terminal, Om.",
-          home: "Kembali ke beranda utama, Om."
-        };
-        setState("speaking");
-        speak(label[cmd], () => {
-          setState("idle");
-          appView.set(navMap[cmd] as any);
-        });
+      if (cmd && cmd !== "ai" && navMap[cmd]) {
+        appView.set(navMap[cmd] as any);
         return;
       }
 
-      // === Full AI conversation ===
+      // === ALL other speech → full AI conversation ===
+      // Cancel any previous in-flight request before starting a new one
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+      // If already processing, skip (prevents rapid-fire overlapping calls)
+      if (isProcessingRef.current) return;
+
+      isProcessingRef.current = true;
       setState("thinking");
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       const apiKey = localStorage.getItem("gemini_api_key") || localStorage.getItem("openai_api_key") || null;
       const provider = (localStorage.getItem("rava_api_provider") as "gemini" | "openai") || "gemini";
 
       try {
         const reply = await askRava(text, historyRef.current, apiKey, provider);
+
+        // If aborted while waiting, discard the reply
+        if (controller.signal.aborted) {
+          isProcessingRef.current = false;
+          return;
+        }
 
         // Strip nav tags and apply navigation if present
         const cmdRegex = /\[COMMAND:OPEN_(\w+)\]/;
@@ -253,10 +267,16 @@ export default function GlobalVoiceAgent() {
         setState("speaking");
         speak(cleanReply, () => {
           setState("idle");
+          isProcessingRef.current = false;
           if (navTarget) appView.set(navTarget as any);
         });
       } catch {
-        setState("idle");
+        if (!controller.signal.aborted) {
+          setState("idle");
+        }
+        isProcessingRef.current = false;
+      } finally {
+        if (abortRef.current === controller) abortRef.current = null;
       }
     };
 
@@ -264,21 +284,30 @@ export default function GlobalVoiceAgent() {
     setTimeout(startListening, 2000);
 
     return () => {
+      // Cancel any in-flight AI request
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+      isProcessingRef.current = false;
       window.speechSynthesis?.cancel();
       try { rec.stop(); } catch (_) { /* noop */ }
     };
-  }, []);
+  }, [standbyOnly]);
+
+  // In standbyOnly mode, render nothing — just keep voiceBridge mounted
+  if (standbyOnly) return null;
 
   // ─── Mic indicator pill (bottom-center) ─────────────────────────────────
   const colours: Record<State, string> = {
-    idle: "rgba(95,230,255,.18)",
-    listening: "rgba(95,230,255,.55)",
+    idle: "rgba(95,230,255,.25)",
+    listening: "rgba(95,230,255,.25)",
     thinking: "rgba(182,157,255,.55)",
     speaking: "rgba(255,207,90,.55)",
   };
   const labels: Record<State, string> = {
     idle: "🎙 Mendengarkan…",
-    listening: "🎙 Aktif…",
+    listening: "🎙 Mendengarkan…",
     thinking: "⋯ Memproses",
     speaking: "🔊 RAVA",
   };
@@ -315,7 +344,7 @@ export default function GlobalVoiceAgent() {
           width: 7, height: 7, borderRadius: "50%",
           background: dotColour[state],
           boxShadow: `0 0 8px ${dotColour[state]}`,
-          animation: state === "idle" ? "pulse 2s ease-in-out infinite" : state === "listening" ? "pulse .7s ease-in-out infinite" : "none",
+          animation: (state === "idle" || state === "listening") ? "pulse 2s ease-in-out infinite" : "none",
         }}
       />
       <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".12em", color: "#eaffff" }}>

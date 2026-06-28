@@ -21,93 +21,6 @@ const SYSTEM_INSTRUCTION =
   "- Untuk keluar / kembali ke Home atau dasbor utama: tambahkan tag `[COMMAND:OPEN_HOME]` " +
   "Pastikan Anda hanya memberikan satu tag perintah yang sesuai jika diminta. Contoh jika diminta membuka musik: 'Tentu Om, mengaktifkan modul musik sekarang. [COMMAND:OPEN_MUSIC]'.";
 
-// Smart offline simulator responses based on keywords
-const OFFLINE_RESPONSES: { keywords: string[]; replies: string[] }[] = [
-  {
-    keywords: ["halo", "hai", "hello", "pagi", "siang", "sore", "malam", "apa kabar"],
-    replies: [
-      "Halo, Om Rangga. Senang mendengarkan suara Anda kembali. Ada yang bisa RAVA bantu hari ini?",
-      "Selamat datang kembali, Om. Semua modul utama siap sedia. Menunggu perintah Anda.",
-      "Halo, Om. Protokol asisten RAVA aktif dan online. Apa yang Anda butuhkan?"
-    ]
-  },
-  {
-    keywords: ["status", "sistem", "diagnostik", "normal", "aman"],
-    replies: [
-      "Semua sistem blankspace OS berjalan dengan efisiensi optimal, Om. Suhu reaktor berada di batas normal.",
-      "Melakukan pemindaian cepat... Semua protokol operasional berfungsi penuh. Tidak ada kerusakan terdeteksi.",
-      "Status sistem aman, Om. Jaringan lokal stabil, dan hand-tracking aktif di latar belakang."
-    ]
-  },
-  {
-    keywords: ["siapa", "kamu", "nama"],
-    replies: [
-      "Saya RAVA, Robotic Agentic Virtual Assistant pribadi Anda, Om Rangga. Didesain untuk mempermudah pekerjaan Anda.",
-      "Saya adalah sistem kecerdasan buatan terintegrasi Anda, Om. Anda bisa memanggil saya RAVA."
-    ]
-  },
-  {
-    keywords: ["musik", "lagu", "putar"],
-    replies: [
-      "Tentu, Om. Membuka pemutar musik sekarang juga. [COMMAND:OPEN_MUSIC]",
-      "Saran yang bagus, Om. Saya akan mengalihkan Anda ke modul Music Player. [COMMAND:OPEN_MUSIC]"
-    ]
-  },
-  {
-    keywords: ["keluar", "tutup", "exit", "home", "dasbor", "kembali"],
-    replies: [
-      "Sangat baik, Om. Menutup terminal dan kembali ke dasbor utama. [COMMAND:OPEN_HOME]",
-      "Protokol penutupan diaktifkan. Kembali ke beranda, Om. [COMMAND:OPEN_HOME]"
-    ]
-  },
-  {
-    keywords: ["gesture", "efek", "suara", "headphones"],
-    replies: [
-      "Tentu Om, memuat modul Gesture FX sekarang. [COMMAND:OPEN_GESTUREFX]",
-      "Mengaktifkan modul efek gerak untuk Anda, Om. [COMMAND:OPEN_GESTUREFX]"
-    ]
-  },
-  {
-    keywords: ["chord", "piano", "keyboard", "lab"],
-    replies: [
-      "Siap Om, membuka Chord Lab piano virtual. [COMMAND:OPEN_CHORDLAB]",
-      "Membuka modul Chord Lab untuk latihan kognitif Anda, Om. [COMMAND:OPEN_CHORDLAB]"
-    ]
-  },
-  {
-    keywords: ["meme", "gambar", "reddit", "lucu"],
-    replies: [
-      "Mencari meme terhangat... Membuka modul Meme of the Day, Om. [COMMAND:OPEN_MEME]",
-      "Tentu Om, mari kita segarkan pikiran dengan Meme hari ini. [COMMAND:OPEN_MEME]"
-    ]
-  },
-  {
-    keywords: ["gemini", "openai", "api key", "koneksi", "online", "internet"],
-    replies: [
-      "Saat ini saya berjalan dalam mode simulasi lokal, Om. Masukkan API Key Anda di panel kanan untuk menghubungkan saya ke kecerdasan penuh satelit.",
-      "Koneksi AI eksternal belum diatur. Silakan daftarkan API Key Anda agar saya bisa mengakses database pengetahuan dunia nyata."
-    ]
-  }
-];
-
-const DEFAULT_OFFLINE_REPLIES = [
-  "Dimengerti, Om. Saya sedang berjalan dalam mode offline lokal saat ini. Mohon atur API Key Anda untuk akses penuh.",
-  "Menarik sekali, Om. Namun kapasitas analisis saya terbatas dalam mode lokal. Ada perintah sistem lain?",
-  "Saya mencatat itu, Om. Semua sistem siap menerima instruksi lanjutan Anda.",
-  "Tentu saja, Om. Namun untuk memberikan jawaban mendalam, saya memerlukan koneksi API aktif."
-];
-
-function generateOfflineReply(query: string): string {
-  const q = query.toLowerCase();
-  for (const group of OFFLINE_RESPONSES) {
-    if (group.keywords.some(kw => q.includes(kw))) {
-      const idx = Math.floor(Math.random() * group.replies.length);
-      return group.replies[idx];
-    }
-  }
-  const idx = Math.floor(Math.random() * DEFAULT_OFFLINE_REPLIES.length);
-  return DEFAULT_OFFLINE_REPLIES[idx];
-}
 
 export async function askRava(
   prompt: string,
@@ -116,9 +29,7 @@ export async function askRava(
   provider: "gemini" | "openai" = "gemini"
 ): Promise<string> {
   if (!apiKey || apiKey.trim() === "") {
-    // Simulate delay for realism
-    await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 600));
-    return generateOfflineReply(prompt);
+    return "API Key belum dikonfigurasi, Om. Silakan masukkan Gemini atau OpenAI API Key Anda di pengaturan untuk mengaktifkan percakapan RAVA.";
   }
 
   if (provider === "openai") {
@@ -160,7 +71,7 @@ export async function askRava(
       return reply.trim();
     } catch (error) {
       console.error("Failed to connect to OpenAI API:", error);
-      return `[OpenAI Connection Error. Fallback to Local Mode] ${generateOfflineReply(prompt)}`;
+      return "Maaf Om Rangga, terjadi kesalahan saat menghubungkan ke OpenAI API. Mohon periksa koneksi atau API Key Anda.";
     }
   } else {
     // Default: Google Gemini
@@ -210,7 +121,7 @@ export async function askRava(
       return reply.trim();
     } catch (error) {
       console.error("Failed to connect to Gemini API:", error);
-      return `[Gemini Connection Error. Fallback to Local Mode] ${generateOfflineReply(prompt)}`;
+      return "Maaf Om Rangga, terjadi kesalahan saat menghubungkan ke Gemini API. Mohon periksa koneksi atau API Key Anda.";
     }
   }
 }

@@ -7,7 +7,6 @@ import type { NewsItem } from "../newsStore";
 import {
   RefreshCw, Settings, X, Save, Database, AlertCircle, Wifi
 } from "lucide-react";
-import { speak } from "../ravaVoice";
 
 // ─── LocalStorage Keys ───────────────────────────────────────────────────────
 const LS_HOST = "rava_pinecone_host";
@@ -128,7 +127,6 @@ export default function NewsApp() {
     if (!h || !k) { setShowSettings(true); return; }
     setLoading(true); setError(null);
     newsStore.loading = true; newsEvents.emit();
-    speak("Sedang Memuat Berita Terbaru");
     try {
       const items = await loadAll(k, h, n, (detectedNs) => { setNs(detectedNs); });
       newsStore.items = items;
@@ -136,14 +134,12 @@ export default function NewsApp() {
       newsStore.error = null;
       newsEvents.emit();
       setLastSync(new Date().toLocaleTimeString("id-ID"));
-      speak(`${items.length} berita dimuat. Pinch dan drag untuk membaca, Om.`);
     } catch (e: any) {
       const msg = e.message ?? "Gagal terhubung ke Pinecone.";
       setError(msg);
       newsStore.loading = false;
       newsStore.error = msg;
       newsEvents.emit();
-      speak("Gagal ambil data, Om. Cek credentials di settings.");
     } finally {
       setLoading(false);
     }
@@ -153,7 +149,7 @@ export default function NewsApp() {
   useEffect(() => {
     const t = setTimeout(() => {
       if (host && apiKey) doLoad(host, apiKey, ns);
-      else { speak("Setup Pinecone dulu ya Om biar RAVA bisa narik berita."); setShowSettings(true); }
+      else { setShowSettings(true); }
     }, 600);
     return () => { clearTimeout(t); window.speechSynthesis?.cancel(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

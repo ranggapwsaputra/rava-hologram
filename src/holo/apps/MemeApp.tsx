@@ -4,7 +4,6 @@
 import { useEffect, useState } from "react";
 import { memeStore, memeEvents } from "../memeStore";
 import type { Meme } from "../memeStore";
-import { speak } from "../ravaVoice";
 import { RefreshCw } from "lucide-react";
 
 const BATCH = 9; // number of memes to pre-load for the gallery
@@ -44,7 +43,6 @@ export default function MemeApp() {
   async function load() {
     setLoading(true); setError(null);
     memeStore.loading = true; memeEvents.emit();
-    speak("Memuat galeri meme hari ini...");
     try {
       const memes = await fetchMemes(BATCH);
       if (memes.length === 0) throw new Error("No memes found");
@@ -52,13 +50,11 @@ export default function MemeApp() {
       memeStore.loading = false;
       memeEvents.emit();
       setCount(memes.length);
-      speak(`${memes.length} meme siap. Pinch dan drag untuk memutar galeri, Om.`);
     } catch (e: any) {
       const msg = "Gagal ambil meme. Cek koneksi Om.";
       setError(msg);
       memeStore.loading = false;
       memeEvents.emit();
-      speak(msg);
     } finally {
       setLoading(false);
     }

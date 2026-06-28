@@ -5,7 +5,7 @@ import { appView } from "../appStore";
 import { hand } from "../handState";
 import { askRava } from "../ravaAi";
 import type { ChatMessage } from "../ravaAi";
-import { speak as ravaSpeak } from "../ravaVoice";
+import { speak as ravaSpeak } from "../voiceBridge";
 import { 
   Mic, MicOff, Send, Volume2, VolumeX, Key, RefreshCw, 
   Cpu, Activity, Shield, Sparkles, MessageSquare, Terminal, Database 
@@ -134,7 +134,6 @@ export default function RobotApp() {
     const timer = setTimeout(() => {
       const greeting = "Sistem online, Om Rangga. Saya RAVA, asisten virtual Anda. Ada yang bisa RAVA bantu?";
       setHistory([{ role: "model", text: greeting }]);
-      speak(greeting);
     }, 1500);
 
     return () => {
@@ -331,7 +330,6 @@ export default function RobotApp() {
     recognitionRef.current?.stop();
     setHistory([]);
     setStatus("IDLE");
-    speak("Memori dibersihkan, Om Rangga.");
   };
 
   const saveApiKey = (key: string) => {
@@ -343,19 +341,11 @@ export default function RobotApp() {
       localStorage.setItem("gemini_api_key", key);
     }
     setShowApiKeyInput(false);
-    speak(`Kunci API ${provider === "openai" ? "Open AI" : "Gemini"} berhasil disimpan, Om.`);
   };
 
   const handleProviderChange = (p: "gemini" | "openai") => {
     setProvider(p);
     localStorage.setItem("rava_api_provider", p);
-    
-    const activeKey = p === "openai" ? openaiKey : geminiKey;
-    if (activeKey) {
-      speak(`Sistem dialihkan ke modul kecerdasan ${p === "openai" ? "Open AI" : "Gemini"}, Om.`);
-    } else {
-      speak(`Sistem dialihkan ke ${p === "openai" ? "Open AI" : "Gemini"}. Berjalan dalam mode simulasi lokal.`);
-    }
   };
 
   const selectQuickCommand = (cmd: string) => {

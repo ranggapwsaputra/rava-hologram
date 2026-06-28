@@ -623,3 +623,24 @@ body { margin: 0; background: #000; overflow: hidden; font-family: "Helvetica Ne
   50% { opacity: 0.75; border-color: rgba(95,230,255,.55); box-shadow: inset 0 0 75px rgba(95,230,255,.28), 0 0 45px rgba(95,230,255,.14); }
 }
 
+/* ===== ORBS STANDBY SCREEN ===== */
+@keyframes orb-orbit-1  { from { transform: rotate(0deg)   translateX(120px) rotate(0deg);    } to { transform: rotate(360deg)  translateX(120px) rotate(-360deg);  } }
+@keyframes orb-orbit-2  { from { transform: rotate(90deg)  translateX(165px) rotate(-90deg);  } to { transform: rotate(450deg)  translateX(165px) rotate(-450deg);  } }
+@keyframes orb-orbit-3  { from { transform: rotate(210deg) translateX(205px) rotate(-210deg); } to { transform: rotate(570deg)  translateX(205px) rotate(-570deg);  } }
+@keyframes orb-orbit-4  { from { transform: rotate(45deg)  translateX(148px) rotate(-45deg);  } to { transform: rotate(405deg)  translateX(148px) rotate(-405deg);  } }
+@keyframes orb-orbit-5  { from { transform: rotate(270deg) translateX(238px) rotate(-270deg); } to { transform: rotate(630deg)  translateX(238px) rotate(-630deg);  } }
+@keyframes orb-orbit-6  { from { transform: rotate(150deg) translateX(185px) rotate(-150deg); } to { transform: rotate(510deg)  translateX(185px) rotate(-510deg);  } }
+@keyframes orb-core-pulse {
+  0%,100% { transform: scale(1);    box-shadow: 0 0 40px 12px rgba(0,212,255,.55), 0 0 90px 28px rgba(110,55,255,.3), 0 0 140px 40px rgba(0,212,255,.12); }
+  50%      { transform: scale(1.1); box-shadow: 0 0 65px 20px rgba(0,212,255,.80), 0 0 130px 45px rgba(130,55,255,.55), 0 0 200px 60px rgba(0,212,255,.22); }
+}
+@keyframes orb-ring-cw  { to { transform: rotate(360deg); } }
+@keyframes orb-ring-ccw { to { transform: rotate(-360deg); } }
+@keyframes orb-float {
+  0%,100% { transform: translateY(0px)   scale(1);    opacity: .75; }
+  50%      { transform: translateY(-18px) scale(1.15); opacity: 1; }
+}
+@keyframes orb-grid-scroll { from { background-position: 0 0; } to { background-position: 60px 60px; } }
+@keyframes orb-scan { 0%{top:2%;opacity:0} 4%{opacity:1} 96%{opacity:1} 100%{top:98%;opacity:0} }
+@keyframes orb-flicker { 0%,89%,91%,100%{opacity:1} 90%{opacity:.55} }
+@keyframes orb-data-blink { 0%,100%{opacity:.4} 50%{opacity:1} }
