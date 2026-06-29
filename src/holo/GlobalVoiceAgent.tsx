@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { appView } from "./appStore";
-import { askRava } from "./ravaAi";
+import { askRava, getEnvProvider, getEnvGeminiKey, getEnvOpenAIKey } from "./ravaAi";
 import type { ChatMessage } from "./ravaAi";
 import { speak } from "./voiceBridge";
 import { toggleTrack, pauseTrack, playTrack, isPlaying } from "./audio";
@@ -234,8 +234,9 @@ export default function GlobalVoiceAgent({ standbyOnly = false }: { standbyOnly?
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const apiKey = localStorage.getItem("gemini_api_key") || localStorage.getItem("openai_api_key") || null;
-      const provider = (localStorage.getItem("rava_api_provider") as "gemini" | "openai") || "gemini";
+      // API keys dari ENV vars (stabil, tidak bergantung localStorage)
+      const provider = getEnvProvider();
+      const apiKey = provider === "openai" ? getEnvOpenAIKey() : getEnvGeminiKey();
 
       try {
         const reply = await askRava(text, historyRef.current, apiKey, provider);

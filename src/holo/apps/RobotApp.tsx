@@ -3,7 +3,7 @@ import { SplineScene } from "../SplineScene";
 import { useFistExit } from "../useExit";
 import { appView } from "../appStore";
 import { hand } from "../handState";
-import { askRava } from "../ravaAi";
+import { askRava, getEnvProvider, getEnvGeminiKey, getEnvOpenAIKey, isEnvConfigured } from "../ravaAi";
 import type { ChatMessage } from "../ravaAi";
 import { speak as ravaSpeak } from "../voiceBridge";
 import { 
@@ -26,12 +26,19 @@ export default function RobotApp() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  // States
-  const [provider, setProvider] = useState<"gemini" | "openai">(() => 
-    (localStorage.getItem("rava_api_provider") as "gemini" | "openai") || "gemini"
+  // States — init dari ENV vars dulu, fallback ke localStorage sebagai override
+  const [provider, setProvider] = useState<"gemini" | "openai">(() => {
+    const stored = localStorage.getItem("rava_api_provider") as "gemini" | "openai" | null;
+    return stored || getEnvProvider();
+  });
+  const [geminiKey, setGeminiKey] = useState<string>(() => 
+    localStorage.getItem("gemini_api_key") || getEnvGeminiKey()
   );
-  const [geminiKey, setGeminiKey] = useState<string>(() => localStorage.getItem("gemini_api_key") || "");
-  const [openaiKey, setOpenaiKey] = useState<string>(() => localStorage.getItem("openai_api_key") || "");
+  const [openaiKey, setOpenaiKey] = useState<string>(() =>
+    localStorage.getItem("openai_api_key") || getEnvOpenAIKey()
+  );
+  // Track whether current key came from ENV (read-only) or was overridden via UI
+  const keyFromEnv = !localStorage.getItem("gemini_api_key") && !localStorage.getItem("openai_api_key") && isEnvConfigured();
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<"IDLE" | "LISTENING" | "THINKING" | "SPEAKING" | "ERROR">("IDLE");
@@ -511,7 +518,9 @@ export default function RobotApp() {
             <span className="text-cyan-400/60 font-mono">CONNECTION STATUS:</span>
             <span className={`font-bold flex items-center gap-1.5 ${activeKey ? "text-emerald-400" : "text-amber-400"}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${activeKey ? "bg-emerald-400 animate-ping" : "bg-amber-400"}`} />
-              {activeKey ? `${provider.toUpperCase()} SECURE` : "LOCAL SIMULATOR"}
+              {activeKey
+                ? `${provider.toUpperCase()} ${keyFromEnv ? "ENV" : "SECURE"}`
+                : "NOT CONFIGURED"}
             </span>
           </div>
           <div className="flex justify-between items-center text-[11px]">
@@ -562,14 +571,19 @@ export default function RobotApp() {
             <span className="flex items-center gap-2">
               <Key size={13} /> {provider === "openai" ? "Config OpenAI Key" : "Config Gemini Key"}
             </span>
-            <span className="text-[10px] text-cyan-500/60">{activeKey ? "● Installed" : "+ Add"}</span>
+            <span className="text-[10px] text-cyan-500/60">
+              {activeKey ? (keyFromEnv ? "● ENV" : "● Saved") : "+ Add"}
+            </span>
           </button>
 
           {showApiKeyInput && (
             <div className="mt-2.5 p-3 bg-black/60 border border-cyan-500/25 rounded-lg space-y-2">
               <p className="text-[10px] text-cyan-400/70 leading-relaxed">
+                {keyFromEnv && (
+                  <span className="block text-emerald-400/80 mb-1">✓ ENV key aktif. Input di sini untuk override.</span>
+                )}
                 {provider === "openai" ? (
-                  <>Dapatkan API Key OpenAI di <a href="https://platform.openai.com" target="_blank" rel="noreferrer" className="underline text-cyan-300 hover:text-white">OpenAI Dashboard</a>.</>
+                  <>Dapatkan API Key di <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="underline text-cyan-300 hover:text-white">OpenAI Dashboard</a>.</>
                 ) : (
                   <>Dapatkan API Key gratis di <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="underline text-cyan-300 hover:text-white">Google AI Studio</a>.</>
                 )}

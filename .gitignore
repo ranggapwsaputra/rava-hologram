@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment / secrets — JANGAN commit key production!
+.env
+.env.local
+.env.*.local
