@@ -97,7 +97,7 @@ OPEN_NEW_CURSOR_ON_DOUBLE_CLAP = False
 CURSOR_OPEN_FULLSCREEN = False
 
 # Google Chrome (fallback: default browser). URLs overridable in .env.
-OPEN_CLAUDE_CODE_IN_CHROME = True
+OPEN_CLAUDE_CODE_IN_CHROME = False
 OPEN_BINANCE_BTC_IN_CHROME = True
 OPEN_CHROME_FULLSCREEN = True
 # False = default Chrome profile (your normal user, extensions, cookies). True = temp dirs under %TEMP% per site.
@@ -108,10 +108,10 @@ BINANCE_CHROME_MONITOR = 3
 
 JARVIS_WELCOME_ENABLED = True
 JARVIS_WELCOME_PHRASE = (
-    "Welcome home sir. "
-    "Congratulations on the new client for your SaaS app—make sure to follow up. "
-    "If it helps: a short, specific note while the deal is still fresh usually "
-    "anchors trust better than a polished deck sent cold a few days later."
+    "Welcome home Boss. "
+    "How has your day been so far? "
+    "Just a quick strategic reminder before you settle in: let's map out the immediate tasks while the context is fresh. Writing down a brief, clear plan right now anchors focus way better than trying to sort through a massive backlog once you're already deep in the zone. "
+    "What are we executing next? Let me know what you want to build or clear off your plate, and let's get to work."
 )
 # Seconds after launching SONG_URI before speaking (gives Spotify/browser time to start).
 JARVIS_AFTER_SONG_DELAY_S = 1.0
@@ -983,18 +983,31 @@ def say_elevenlabs_text(text: str) -> None:
 
 _connected_clients: set[any] = set()  # type: ignore[type-arg]
 _async_loop: asyncio.AbstractEventLoop | None = None
+# Timestamp of the last double-clap (monotonic). Used to send a catch-up
+# clap_detected to clients that reconnect shortly after a clap.
+_last_clap_time: float = 0.0
+# If a new client connects within this many seconds of a clap, send catch-up.
+_CLAP_CATCHUP_WINDOW_S: float = 10.0
 
 def broadcast_clap_event() -> None:
     """Notify all connected frontend WebSocket clients that a double-clap occurred."""
-    if not _async_loop or not _connected_clients:
+    global _last_clap_time
+    _last_clap_time = time.monotonic()
+    if not _async_loop:
         return
     async def _send() -> None:
         msg = json.dumps({"status": "clap_detected"})
+        stale: list[any] = []
         for ws in list(_connected_clients):
             try:
                 await ws.send(msg)
+                log.info("[WS] clap_detected → client %s",
+                         getattr(ws, 'remote_address', '?'))
             except Exception as e:
                 log.warning("[WS] Failed to send clap event to client: %s", e)
+                stale.append(ws)
+        for ws in stale:
+            _connected_clients.discard(ws)
     asyncio.run_coroutine_threadsafe(_send(), _async_loop)
 
 
@@ -1005,6 +1018,15 @@ async def _ws_handler(websocket: any) -> None:  # type: ignore[type-arg]
     _connected_clients.add(websocket)
     try:
         await websocket.send(json.dumps({"status": "ready"}))
+        # Catch-up: if a clap happened recently (e.g. while client was reconnecting
+        # after a Vite HMR reload), send the event immediately so the UI wakes up.
+        age = time.monotonic() - _last_clap_time
+        if 0 < age <= _CLAP_CATCHUP_WINDOW_S:
+            log.info("[WS] Sending catch-up clap_detected (%.1fs ago) to %s", age, client)
+            try:
+                await websocket.send(json.dumps({"status": "clap_detected"}))
+            except Exception:
+                pass
         async for raw in websocket:
             try:
                 msg = json.loads(raw)

@@ -17,7 +17,7 @@
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const WS_URL = "ws://127.0.0.1:7788";
-const RECONNECT_DELAY_MS = 3000;   // wait before retry after disconnect
+const RECONNECT_DELAY_MS = 800;    // wait before retry after disconnect
 const CONNECT_TIMEOUT_MS = 1500;   // if no "ready" within this time, use fallback
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ function connect(): void {
         break;
 
       case "clap_detected":
-        console.info("[voiceBridge] Acoustic double-clap trigger detected from Voice Agent!");
+        console.info("[voiceBridge] Acoustic double-clap trigger detected! Notifying", clapListeners.size, "listener(s).");
         clapListeners.forEach(cb => cb());
         break;
 
@@ -171,6 +171,9 @@ function _flushQueueOnDisconnect(): void {
 
 // Start connecting immediately when the module loads
 connect();
+
+// Debug helper — lets HoloPlayer log how many clap listeners are registered
+(window as any).__ravaClapDebug = () => clapListeners.size;
 
 // ─── Browser Speech Synthesis fallback ───────────────────────────────────────
 
@@ -296,7 +299,5 @@ export function bridgeStatus(): WsState {
 }
 
 // ─── Module-level auto-connect ────────────────────────────────────────────────
-// Connect immediately when this module is first imported so that clap_detected
-// events from jarvis.py are received during Standby Mode — before any speak()
-// call has ever been made.
-connect();
+// Note: connect() is already called at line 173 when the module loads.
+// A second call here is intentionally removed to prevent race conditions.

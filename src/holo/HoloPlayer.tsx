@@ -89,11 +89,13 @@ export default function HoloPlayer() {
 
   function enter() {
     if (startedRef.current) return;
-    startedRef.current = true;
-    resumeAudio();
-    powerOn();
+    // Try to resume/start audio — these may fail without a prior user gesture,
+    // so we catch silently and still wake the UI.
+    try { resumeAudio(); } catch (e) { console.warn("[HoloPlayer] resumeAudio failed:", e); }
+    try { powerOn(); } catch (e) { console.warn("[HoloPlayer] powerOn failed:", e); }
     setBooting(true);
     setStarted(true);
+    startedRef.current = true; // set AFTER state updates so a failed attempt can be retried
   }
 
   // Standby mode by default. Subscribe to acoustic double-clap trigger from voice agent.
@@ -105,10 +107,11 @@ export default function HoloPlayer() {
 
   useEffect(() => {
     const unsubscribe = onClap(() => {
-      console.info("[HoloPlayer] Acoustic double-clap detected! Waking up R.A.V.A OS...");
-      startTrackingRef.current();
+      console.info("[HoloPlayer] 👏 Clap received — listeners active, waking up R.A.V.A OS...");
+      try { startTrackingRef.current(); } catch (e) { console.warn("[HoloPlayer] startTracking error:", e); }
       enterRef.current();
     });
+    console.info("[HoloPlayer] onClap listener registered. Total in bridge:", (window as any).__ravaClapDebug?.() ?? "?");
     return unsubscribe;
   }, []);
 
